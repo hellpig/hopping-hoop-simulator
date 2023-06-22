@@ -4,10 +4,10 @@ Simulate a hopping hoop! Only assume flat ground and, if possible, rolling-witho
 Hopping hoop...  
 [https://www.youtube.com/watch?v=ETRpkp03stQ](https://www.youtube.com/watch?v=ETRpkp03stQ)
 
-Run the Python file, hop.py! I use Matplotlib for graphs and animation, and I use SciPy for the numerical solvers and integrators.
+Run the Python file, hop.py! I use Matplotlib for graphs and animation, and I use SciPy for the numerical solvers and integrators. Change the parameters in the parameter section near the top.
 
 # math
-The best derivation of the equation of motion (the differential equation that solves to give *θ*(*t*)) is to apply Newton's 2nd law to the edge mass, *M*, and the disk of mass *m* separately, then use Newton's 3rd law to relate the contact force between them. Finally, apply Newton's 2nd law for rotation to the *disk*. To get the acceleration of *M*, its velocity is -*r* *ω* sin*θ* + *v\_x* in the *x* direction and *r* *ω* cos*θ* in the *y* direction, where *v\_x* = - *r* *ω* is true when rolling without slipping.
+The best derivation of the equation of motion (the differential equation that solves to give *θ*(*t*)) is to apply Newton's 2nd law to the edge mass, *M*, and the hoop of mass *m* separately, then use Newton's 3rd law to relate the contact force between them. Finally, apply Newton's 2nd law for rotation to the *hoop*. To get the acceleration of *M*, its velocity is -*r* *ω* sin*θ* + *v\_x* in the *x* direction and *r* *ω* cos*θ* in the *y* direction, where *v\_x* = - *r* *ω* is true when rolling without slipping.
 
 Another good derivation is to apply Newton's 2nd law and Newton's 2nd law for rotation to the *center of mass* (CM). For an accelerating pivot, you can always use the CM. For Newton's 2nd law, the acceleration is the acceleration of the object's CM. 
 
