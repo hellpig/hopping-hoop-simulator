@@ -1,11 +1,13 @@
 #!/usr/bin/env python3.11
 #
 # Simulate the hopping hoop!
-#   https://www.youtube.com/watch?v=ETRpkp03stQ
+#   https://youtu.be/ETRpkp03stQ
 # Assume flat ground but not any initial condition or radial distribution of mass of "hoop".
 # If possible, assume that rolling without slipping is the initial condition.
+# Assume that the edge mass, M, is exactly at r.
 #
 # All units are MKS.
+#
 # Radians are used with counterclockwise being the positive direction.
 # theta points to the mass on edge of hoop from the center of the hoop.
 # theta=0 points to the right.
@@ -21,10 +23,12 @@
 # I need to play around with the parameter space some more to see what else can happen!
 #
 # Next steps...
-#  - think about continuing after hop?
+#  - think about continuing after landing from hop?
+#
+# (c) 2023 Bradley Knockel
 
 
-from numpy import sin, cos, sqrt, radians, degrees, linspace, concatenate, isclose, arange, interp
+from numpy import sin, cos, sqrt, radians, degrees, absolute, diff, linspace, concatenate, isclose, arange, interp
 from scipy.integrate import solve_ivp, cumulative_trapezoid
 from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
@@ -67,6 +71,13 @@ omega0 = -11
 # absolute tolerance of simulation
 abs_tol = 1E-8
 
+# to slow down the animation compared to real time
+delayMultiplier = 2   # a positive integer
+
+
+## If you search this file for "feel free",
+## you will find some other interesting parameters
+## that you might want to change.
 
 
 if mu_k > mu_s:
@@ -100,16 +111,15 @@ def makePlots():
   plt.figure()
   plt.plot( big[0], big[4], 'k' )
   plt.title("v_x")
-  x_pos = cumulative_trapezoid( big[4], x = big[0], initial = 0 )
   plt.figure()
-  plt.plot( big[0], x_pos, 'k' )
+  plt.plot( big[0], cumulative_trapezoid( big[4], x = big[0], initial = 0 ), 'k' )
   plt.title("x")
   if len(big) == 6:   # if hop happened
     plt.figure()
     plt.plot( big[0], big[5], 'k' )
     plt.title("y")
 
-  # the following pauses code execution, so call makePlots() just before exit()
+  # the following pauses code execution, so call makePlots() after doing useful print()s
   plt.show()
 
 
@@ -140,7 +150,7 @@ def animate():
 
 
     # setup figure
-    pad = 0.1
+    pad = 0.1         # prevents edge of hoop from sometimes being chopped off
     maxInches = 8     # feel free to change!
     xRange = [ min(xNew) - (1+pad)*r, max(xNew) + (1+pad)*r ]
     yRange = [ -(1+pad)*r, max(yNew) + (1+pad)*r ]
@@ -161,8 +171,6 @@ def animate():
         return [circle, arrow]
 
 
-    delayMultiplier = 2   # feel free to change to another positive integer
-
 
     anim = animation.FuncAnimation(fig, animateFrame, frames=coordsList, interval = tStep_ms*delayMultiplier, repeat_delay=1000, blit=True)   # repeat_delay not working for some reason
 
@@ -176,7 +184,7 @@ def animate():
     ## The following first required `sudo port install ffmpeg` on my macOS
     ## On Windows: https://www.geeksforgeeks.org/how-to-install-ffmpeg-on-windows/
     ##   though you only need the ffmpeg.exe file
-    #anim.save('animation.mp4', writer = animation.FFMpegWriter(fps=30))
+    #anim.save('animation.mp4', writer = animation.FFMpegWriter(fps=30))     # feel free to uncomment this line!
 
 
 
@@ -185,7 +193,7 @@ def animate():
 #############################
 
 
-# pre calculate
+# pre calculate (these variables can be used for sliding and hopping too)
 g_over_r = g/r
 aTerm = I / (M * r * r) + m/M + 2.0   # this is a constant term in the ODE
 weight = (m+M)*g
@@ -218,7 +226,7 @@ def energyFunc_RollingWithoutSlipping(y):   # y is [ theta, omega, ... ]
 
 
 
-def rollWithoutSlipping(finalT, finalY, big):
+def rollWithoutSlipping(finalT, finalY):
 
 
     ## solve the ODE!
@@ -284,7 +292,7 @@ def rollWithoutSlipping(finalT, finalY, big):
         finalY = finalY_hop
     else:   # neither
         print("  Nothing interesting happened before tStop.")
-        print("  change in theta =", degrees(sol.y[0][-1] - sol.y[0][0]), "degrees")
+        print("  sum of |Δtheta| =", degrees( sum(absolute(diff(sol.y[0]))) ), "degrees")
         print("  energy needed to make it over the top is", M*g*r)
         print("  energy =", energyFunc_RollingWithoutSlipping(sol.y[:,0]) )
         print()
@@ -310,7 +318,7 @@ def rollWithoutSlipping(finalT, finalY, big):
     # add on v_x
     finalY = concatenate( (finalY,  [ - r * finalY[1] ] ) )
 
-    return (finalT, finalY, slide, big)
+    return (finalT, finalY, slide)
 
 
 
@@ -339,18 +347,17 @@ def trySign(signFrict):
 
 
 
-# This is the mechanical energy; y is [ theta, omega, v_x, ... ]
-def energyFunc_notHopping(y):
-  return 0.5 * (I + M * r * r * cos(y[0])**2) * y[1]**2 + 0.5 * m * y[2]**2 + 0.5 * M * (-r*y[1]*sin(y[0]) + y[2])**2 + M * g * r * sin(y[0])
 
 
-
-def rollWithSliding(finalT, finalY, big):
+def rollWithSliding(finalT, finalY):
 
 
 
     ## y is [ theta, omega, v_x, W ], where W doesn't affect any derivatives, and v_x only affects the derivative of W
-    ## The only reason to integrate to get W is to check energy conservation
+    ## The only reason to integrate to get W is to check energy conservation. dW/dt = power = |v_bottom * F_fr|
+
+    ## The following 3 functions must be nested functions so that they are in the same scope as...
+    ##   mu, ratio, ratio2, constTerm, constTerm2
 
     def derivativesSliding(t, y):
       s = sin(y[0])
@@ -374,6 +381,12 @@ def rollWithSliding(finalT, finalY, big):
     normalForceSliding.terminal = True
     speedDiff.terminal = True
 
+
+
+
+    # This is the mechanical energy; y is [ theta, omega, v_x, ... ]
+    def energyFunc_notHopping(y):
+      return 0.5 * (I + M * r * r * cos(y[0])**2) * y[1]**2 + 0.5 * m * y[2]**2 + 0.5 * M * (-r*y[1]*sin(y[0]) + y[2])**2 + M * g * r * sin(y[0])
 
 
 
@@ -492,11 +505,89 @@ def rollWithSliding(finalT, finalY, big):
 
 
 
-        # remove W from finalY
-        finalY = finalY[0:3]
+
+    return (finalT, finalY[0:3], back)
 
 
-    return (finalT, finalY, back, big)
+
+
+
+#############################
+# hop
+#############################
+
+
+def hop(finalT, finalY):
+
+    # for center of mass (CM)
+    r_cm = M*r / (m+M)
+    I_cm = I + M*r*r - (m+M)*r_cm*r_cm
+
+
+    # for center of mass (CM) initial velocity
+    # Note that omega does not change from just before to just after the hop
+    vx0 = - r_cm * finalY[1] * sin(finalY[0]) + finalY[2]
+    vy0 = r_cm * finalY[1] * cos(finalY[0])
+
+
+
+    # y_center is 0 when t=0 and when hoop hits the ground
+    # I do not believe that there are ever more solutions than this
+    def y_center(t):
+      return r_cm * sin(finalY[0]) + vy0 * t - 0.5 * g * t**2 - r_cm * sin(finalY[0] + finalY[1] * t)
+
+    #def vy_center(t):   # time derivative of y_center
+    #  return vy0 - g * t - r_cm * finalY[1] * cos(finalY[0] + finalY[1] * t)
+
+    def ay_center(t):
+      return -g + r_cm * finalY[1] * finalY[1] * sin(finalY[0] + finalY[1] * t)
+
+    def energyFunc_Air(t):
+      return 0.5 * (m + M) * (vx0 * vx0 + (vy0 - g * t)**2 ) + weight * (r_cm * sin(finalY[0]) + vy0 * t - 0.5 * g * t**2) + 0.5 * I_cm * finalY[1] * finalY[1]
+
+
+
+    #print("  initial y_center =", y_center(0) )    # should be 0; trivially 0
+    #print("  initial vy_center =", vy_center(0) )  # should be 0; trivially 0
+    print("  initial ay_center =", ay_center(0) )  # should not be negative
+
+
+
+    # find t, the time the ball is in the air
+    bestGuess = 2*vy0/g  # completely ignores rotation of the hoop
+    guesses = linspace(3*bestGuess, 0.0, num = 101)   # feel free to change
+    absoluteTolerance = 1E-5                          # feel free to change
+    for guess in guesses:
+      t = fsolve(y_center, guess)[0]
+      if not isclose(t, 0.0, atol = absoluteTolerance):
+        break
+    if isclose(t, 0.0, atol = absoluteTolerance):
+      print("  ERROR: fsolve() failed to find non-trivial solution")
+
+
+    # make graph
+    tList = linspace(0.0, 1.25*t, num=101)      # feel free to change num and the final time
+    ax[1,1].plot(tList, y_center(tList), 'r-', t, y_center(t), 'r.', tList, 0.0*tList, 'k-')
+    ax[1,1].set(xlabel="t_air", ylabel="y_center")
+
+
+    print("  time in air =", str(t) + ", guess =", bestGuess)
+    print("  hits ground at t =", finalT + t)
+    print("  energies in air:", energyFunc_Air(linspace(0, t, num=3)))
+    print()
+
+
+
+    tList = linspace(0.0, t, num=101)    # feel free to change num
+    omegaAir = tList*0.0 + finalY[1]
+    thetaAir = finalY[0] + omegaAir*tList
+
+    big.append( concatenate(( big[0]*0.0, y_center(tList) )) )   # y_pos
+    big[0] = concatenate(( big[0], finalT + tList ))
+    big[1] = concatenate(( big[1], thetaAir ))
+    big[2] = concatenate(( big[2], omegaAir ))
+    big[3] = concatenate(( big[3], 0.0*tList ))                  # alpha
+    big[4] = concatenate(( big[4], vx0 + r_cm * finalY[1] * sin(finalY[0] + finalY[1] * tList) ))   # v_x
 
 
 
@@ -520,7 +611,7 @@ if maxFriction_minus_requiredFriction(0, (theta0,omega0)) <= 0.0:
 
 # big is a 2D list that continuously grows as the code executes
 #   [ time, theta, omega, alpha, v_x ]
-big = [ [] for i in range(5)]
+big = [ [] for i in range(5) ]
 
 
 # initialize
@@ -529,10 +620,10 @@ finalY = (theta0, omega0)
 
 while True:
 
-  finalT, finalY, slide, big = rollWithoutSlipping(finalT, finalY[0:2], big)   # will exit the code if nothing happens before tStop
+  finalT, finalY, slide = rollWithoutSlipping(finalT, finalY[0:2])   # will exit the code if nothing happens before tStop
 
   if slide:
-    finalT, finalY, back, big = rollWithSliding(finalT, finalY, big)   # will handle sign of friction changing directions
+    finalT, finalY, back = rollWithSliding(finalT, finalY)   # will handle sign of friction changing directions
   else:      # hop
     break
 
@@ -540,87 +631,10 @@ while True:
     break
 
 
-
-#############################
-# do hop
-#############################
-
-
-
-# for center of mass (CM)
-r_cm = M*r / (m+M)
-I_cm = I + M*r*r - (m+M)*r_cm*r_cm
-
-
-# for center of mass (CM) initial velocity
-# Note that omega does not change from just before to just after the hop
-vx0 = - r_cm * finalY[1] * sin(finalY[0]) + finalY[2]
-vy0 = r_cm * finalY[1] * cos(finalY[0])
-
-
-
-
-# y_center is 0 when t=0 and when hoop hits the ground
-# I do not believe that there are ever more solutions than this
-def y_center(t):
-  return r_cm * sin(finalY[0]) + vy0 * t - 0.5 * g * t**2 - r_cm * sin(finalY[0] + finalY[1] * t)
-
-def vy_center(t):   # time derivative of y_center
-  return vy0 - g * t - r_cm * finalY[1] * cos(finalY[0] + finalY[1] * t)
-
-def ay_center(t):
-  return -g + r_cm * finalY[1] * finalY[1] * sin(finalY[0] + finalY[1] * t)
-
-def energyFunc_Air(t):
-  return 0.5 * (m + M) * (vx0 * vx0 + (vy0 - g * t)**2 ) + weight * (r_cm * sin(finalY[0]) + vy0 * t - 0.5 * g * t**2) + 0.5 * I_cm * finalY[1] * finalY[1]
-
-
-
-#print("  initial y_center =", y_center(0) )    # should be 0; trivially 0
-#print("  initial vy_center =", vy_center(0) )  # should be 0; trivially 0
-print("  initial ay_center =", ay_center(0) )  # should not be negative
-
-
-
-# find t, the time the ball is in the air
-bestGuess = 2*vy0/g  # completely ignores rotation of the hoop
-guesses = linspace(3*bestGuess, 0.0, num = 101)   # feel free to change
-absoluteTolerance = 1E-5         # feel free to change
-for guess in guesses:
-  t = fsolve(y_center, guess)[0]
-  if not isclose(t, 0.0, atol = absoluteTolerance):
-    break
-if isclose(t, 0.0, atol = absoluteTolerance):
-  print("  ERROR: fsolve() failed to find non-trivial solution")
-
-
-# make graph
-tList = linspace(0.0, 1.25*t, num=101)  # feel free to change num and the final time
-ax[1,1].plot(tList, y_center(tList), 'r-', t, y_center(t), 'r.', tList, 0.0*tList, 'k-')
-ax[1,1].set(xlabel="t_air", ylabel="y_center")
-
-
-print("  time in air =", str(t) + ", guess =", bestGuess)
-print("  hits ground at t =", finalT + t)
-print("  energies in air:", energyFunc_Air(linspace(0, t, num=3)))
-print()
-
-
-
-tList = linspace(0.0, t, num=101)    # feel free to change num
-omegaAir = tList*0.0 + finalY[1]
-thetaAir = finalY[0] + omegaAir*tList
-
-big.append( concatenate(( big[0]*0.0, y_center(tList) )) )   # y_pos
-big[0] = concatenate(( big[0], finalT + tList ))
-big[1] = concatenate(( big[1], thetaAir ))
-big[2] = concatenate(( big[2], omegaAir ))
-big[3] = concatenate(( big[3], 0.0*tList ))   # alpha
-big[4] = concatenate(( big[4], vx0 + r_cm * finalY[1] * sin(finalY[0] + finalY[1] * tList) ))   # v_x
-
-
+hop(finalT, finalY)
 
 
 makePlots()
 animate()
+
 
