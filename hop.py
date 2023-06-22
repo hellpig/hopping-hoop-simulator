@@ -34,6 +34,55 @@ from matplotlib import animation
 # https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.plot.html
 
 
+
+#############################
+# Set parameters
+#############################
+# all must be positive except for...
+#  • theta0 and omega0 can be anything
+#  • rotational inertia of hoop, I, can be 0 or positive
+#  • mu_k can be 0 or positive, but, if it is 0 and a hop doesn't occur, the code will never end!
+#  • m can be 0 or positive, but, if m=0, issues arise and stay away from theta being straight down
+#  • g can be anything, but, if g <= 0, the calculation of when hop is finished obviously breaks
+
+g = 9.81
+
+# hoop
+r = 0.5
+m = 0.5
+I = 0.9 * m * r * r
+
+# hoop and ground friction coefficients
+mu_s = 0.2
+mu_k = 0.1
+
+# mass on edge of hoop (kg)
+M = 1.0
+
+# initial conditions (rad and rad/s)
+# Note that straight down has alpha=0 has lots of Fn
+theta0 = radians(-90)
+omega0 = -11
+
+# absolute tolerance of simulation
+abs_tol = 1E-8
+
+
+
+if mu_k > mu_s:
+  print("  ERROR: your mu_k is larger than your mu_s.")
+  exit()
+
+if I > m*r*r:
+  print("  ERROR: your I is larger than m r^2.")
+  exit()
+
+
+
+#############################
+# graphing and animation code
+#############################
+
 _,ax = plt.subplots(2,2)
 
 
@@ -129,49 +178,6 @@ def animate():
     ##   though you only need the ffmpeg.exe file
     #anim.save('animation.mp4', writer = animation.FFMpegWriter(fps=30))
 
-
-
-#############################
-# Set parameters
-#############################
-# all must be positive except for...
-#  • theta0 and omega0 can be anything
-#  • rotational inertia of hoop, I, can be 0 or positive
-#  • mu_k can be 0 or positive, but, if it is 0 and a hop doesn't occur, the code will never end!
-#  • m can be 0 or positive, but, if m=0, issues arise and stay away from theta being straight down
-#  • g can be anything, but, if g <= 0, the calculation of when hop is finished obviously breaks
-
-g = 9.81
-
-# hoop
-r = 0.5
-m = 0.5
-I = 0.9 * m * r * r
-
-# hoop and ground friction coefficients
-mu_s = 0.2
-mu_k = 0.1
-
-# mass on edge of hoop (kg)
-M = 1.0
-
-# initial conditions (rad and rad/s)
-# Note that straight down has alpha=0 has lots of Fn
-theta0 = radians(-90)
-omega0 = -11
-
-# absolute tolerance of simulation
-abs_tol = 1E-8
-
-
-
-if mu_k > mu_s:
-  print("  ERROR: your mu_k is larger than your mu_s.")
-  exit()
-
-if I > m*r*r:
-  print("  ERROR: your I is larger than m r^2.")
-  exit()
 
 
 #############################
