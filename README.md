@@ -11,7 +11,7 @@ The best derivation of the equation of motion (the differential equation that so
 
 Another good derivation is to apply Newton's 2nd law and Newton's 2nd law for rotation to the *center of mass* (CM). For an accelerating pivot, you can always use the CM. For Newton's 2nd law, the acceleration is the acceleration of the object's CM. 
 
-Whatever you do, I highly recommend that you check your rolling-without-slipping equation of motion with what you get from Lagrangian mechanics. Define *L*, the Lagrangian, as kinetic energy minus potential energy, where *θ* and its derivatives (*ω*) are the only time-dependent variables that appear. Then, ∂*L*/∂*θ* = d(∂*L*/∂*ω*)/dt gives the equation of motion.
+Whatever you do, I highly recommend that you check your rolling-without-slipping equation of motion with what you get from Lagrangian mechanics. Define *L*, the Lagrangian, as kinetic energy minus potential energy, where *θ* and its time derivatives (*ω*) are the only time-dependent variables that appear. Then, ∂*L*/∂*θ* = d(∂*L*/∂*ω*)/dt gives the equation of motion.
 
 Keep in mind that, whenever calculating kinetic energy, it only equals rotational + translational if rotational\_CM + translational\_CM. So, for convenience, I find the kinetic energy of each object separately (except during the hop).
 
