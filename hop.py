@@ -17,18 +17,18 @@
 # That is, even with a huge mu_s, the condition to slide is usually (always?) met before the hop.
 #
 # The following cases have been observed to occur from this code...
-#   rolling without slipping -> slide -> rolling without slipping -> slide
-#   rolling without slipping -> slide -> hop
+#  • rolling without slipping -> slide -> rolling without slipping -> slide
+#  • rolling without slipping -> slide -> hop
 # Note that the slide phase can have the direction of friction switch one or more times.
 # I need to play around with the parameter space some more to see what else can happen!
 #
 # Next steps...
-#  - think about continuing after landing from hop?
+#  • think about continuing after landing from hop?
 #
 # (c) 2023 Bradley Knockel
 
 
-from numpy import sin, cos, sqrt, radians, degrees, absolute, diff, linspace, concatenate, isclose, arange, interp
+from numpy import sin, cos, sqrt, radians, degrees, sign, absolute, diff, linspace, concatenate, isclose, arange, interp
 from scipy.integrate import solve_ivp, cumulative_trapezoid
 from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
@@ -49,6 +49,7 @@ from matplotlib import animation
 #  • m can be 0 or positive, but, if m=0, issues arise and stay away from theta being straight down
 #  • g can be anything, but, if g <= 0, the calculation of when hop is finished obviously breaks
 
+
 g = 9.81
 
 # hoop
@@ -68,20 +69,22 @@ M = 1.0
 theta0 = radians(-90)
 omega0 = -11
 
+
+
 # absolute tolerance of simulation
 abs_tol = 1E-8
 
 # to slow down the animation compared to real time
 delayMultiplier = 2   # a positive integer
 
-
 ## If you search this file for "feel free",
 ## you will find some other interesting parameters
 ## that you might want to change.
 
 
-if mu_k > mu_s:
-  print("  ERROR: your mu_k is larger than your mu_s.")
+
+if mu_k >= mu_s:
+  print("  ERROR: your mu_k is not less than your mu_s.")
   exit()
 
 if I > m*r*r:
@@ -150,7 +153,7 @@ def animate():
 
 
     # setup figure
-    pad = 0.1         # prevents edge of hoop from sometimes being chopped off
+    pad = 0.2         # prevents edge of hoop from sometimes being chopped off
     maxInches = 8     # feel free to change!
     xRange = [ min(xNew) - (1+pad)*r, max(xNew) + (1+pad)*r ]
     yRange = [ -(1+pad)*r, max(yNew) + (1+pad)*r ]
@@ -172,7 +175,7 @@ def animate():
 
 
 
-    anim = animation.FuncAnimation(fig, animateFrame, frames=coordsList, interval = tStep_ms*delayMultiplier, repeat_delay=1000, blit=True)   # repeat_delay not working for some reason
+    anim = animation.FuncAnimation(fig, animateFrame, frames=coordsList, interval = tStep_ms*delayMultiplier, repeat_delay=1000, blit=True)   # repeat_delay not working on macOS for some reason
 
 
 
@@ -181,7 +184,7 @@ def animate():
 
     plt.show()
 
-    ## The following first required `sudo port install ffmpeg` on my macOS
+    ## The following first required `sudo port install ffmpeg` on macOS
     ## On Windows: https://www.geeksforgeeks.org/how-to-install-ffmpeg-on-windows/
     ##   though you only need the ffmpeg.exe file
     #anim.save('animation.mp4', writer = animation.FFMpegWriter(fps=30))     # feel free to uncomment this line!
@@ -276,7 +279,7 @@ def rollWithoutSlipping(finalT, finalY):
     # sort out if you hop, slide, or neither
     slide = False
     if finalT_slide and finalT_hop:
-        if finalT_slide <= finalT_hop:
+        if finalT_slide < finalT_hop:   # what if they are equal?
           finalT = finalT_slide
           finalY = finalY_slide
           slide = True
@@ -327,7 +330,7 @@ def rollWithoutSlipping(finalT, finalY):
 #############################
 
 
-def trySign(signFrict):
+def trySign(signFrict):  # signFrict is integer: -1 or +1
   mu = signFrict * abs(mu_k)
   ratio = (m+M)/M
   ratio2 = mu/ratio
@@ -339,11 +342,13 @@ def trySign(signFrict):
   temp = y[1]*y[1]*s
   alpha = (-mu*temp + constTerm - g_over_r*c + mu*g_over_r*s - ratio2*temp*s + temp*c/ratio) / (constTerm2 - mu*c - ratio2*s*c - s*s/ratio)
   dvxdt_over_r = mu*g_over_r + ratio2*(-temp + alpha*c) + (temp*c/s + alpha*s)/ratio
-  temp = alpha + dvxdt_over_r       # signFrict should be the opposite sign of this
-  signFrict_calculated = - temp / abs(temp)
-  if abs(signFrict - signFrict_calculated) > 1.0:
-    return False
-  return True
+  signFrict_calculated = - sign(alpha + dvxdt_over_r)
+  if signFrict_calculated == 0:
+    print("yikes!")
+    exit()
+  if signFrict_calculated == signFrict:
+    return True
+  return False
 
 
 
@@ -357,7 +362,7 @@ def rollWithSliding(finalT, finalY):
     ## The only reason to integrate to get W is to check energy conservation. dW/dt = power = |v_bottom * F_fr|
 
     ## The following 3 functions must be nested functions so that they are in the same scope as...
-    ##   mu, ratio, ratio2, constTerm, constTerm2
+    ##   signFrict, mu, ratio, ratio2, constTerm, constTerm2
 
     def derivativesSliding(t, y):
       s = sin(y[0])
@@ -376,7 +381,7 @@ def rollWithSliding(finalT, finalY):
 
     def speedDiff(t, y):
       return signFrict * (r*y[1] + y[2])   # I added signFrict to always make this negative
-    speedDiff.direction = 1                # to prevent the event from being triggered immediately (this works only when speedDiff is negative)
+    speedDiff.direction = 1                # to prevent the event from always being triggered immediately (this works only when speedDiff is negative)
 
     normalForceSliding.terminal = True
     speedDiff.terminal = True
@@ -449,7 +454,7 @@ def rollWithSliding(finalT, finalY):
         # sort out if you hop, go back to static friction, or neither
         back = False
         if finalT_static and finalT_hop:
-            if finalT_static < finalT_hop:
+            if finalT_static < finalT_hop:   # what if they are equal?
               finalT = finalT_static
               finalY = finalY_static
               back = True
@@ -472,6 +477,9 @@ def rollWithSliding(finalT, finalY):
 
         temp = derivativesSliding(0.0, solSlide.y[:,0])
         print("  initial α + 1/r * d(v_x)/dt =", temp[1] + temp[2]/r)    # should have sign opposite signFrict
+        if sign(signFrict) != -sign(temp[1] + temp[2]/r):   # I check this because I do:  signFrict *= -1.0
+          print("aaahhhh!")
+          exit()
         print("  final t =", finalT)
         print("  final θ =", str(finalY[0]) + ", so " + str(degrees(finalY[0])%360) + "°")
         print("  final ω =", finalY[1])
@@ -479,7 +487,7 @@ def rollWithSliding(finalT, finalY):
         print("  final F_n =", normalForceSliding(finalT, finalY))
         print("  final v_x =", finalY[2])
         print("  final r ω + v_x =", signFrict * speedDiff(finalT, finalY) )    # if not 0, should have sign opposite signFrict
-        print("  energies:", energyFunc_notHopping(solSlide.y[:,0]), energyFunc_notHopping(finalY))
+        print("  mechanical energies:", energyFunc_notHopping(solSlide.y[:,0]), energyFunc_notHopping(finalY))
         print("  work by kinetic friction =", finalY[3])
 
         slide = False
@@ -536,9 +544,6 @@ def hop(finalT, finalY):
     def y_center(t):
       return r_cm * sin(finalY[0]) + vy0 * t - 0.5 * g * t**2 - r_cm * sin(finalY[0] + finalY[1] * t)
 
-    #def vy_center(t):   # time derivative of y_center
-    #  return vy0 - g * t - r_cm * finalY[1] * cos(finalY[0] + finalY[1] * t)
-
     def ay_center(t):
       return -g + r_cm * finalY[1] * finalY[1] * sin(finalY[0] + finalY[1] * t)
 
@@ -547,9 +552,11 @@ def hop(finalT, finalY):
 
 
 
-    #print("  initial y_center =", y_center(0) )    # should be 0; trivially 0
-    #print("  initial vy_center =", vy_center(0) )  # should be 0; trivially 0
-    print("  initial ay_center =", ay_center(0) )  # should not be negative
+    temp = ay_center(0)
+    print("  initial ay_center =", temp )  # should not be negative
+    if not isclose(temp, 0.0, atol = abs_tol):   # I think it even has to be 0!?
+      print("oh no!")
+      exit()
 
 
 
