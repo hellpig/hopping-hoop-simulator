@@ -3,7 +3,7 @@
 # Simulate the hopping hoop!
 #   https://youtu.be/ETRpkp03stQ
 # Assume flat ground but not any initial condition or radial distribution of mass of "hoop".
-# If possible, assume that rolling without slipping is the initial condition.
+# If possible, assume that rolling without sliding is the initial condition.
 # Assume that the edge mass, M, is exactly at r.
 #
 # All units are MKS.
@@ -13,12 +13,12 @@
 # theta=0 points to the right.
 #
 # I believe that sliding is at least sometimes necessary before a hop for the math to be consistent!
-# That is, not checking the rolling-without-slipping ODE for sliding doesn't work.
+# That is, not checking the rolling-without-sliding ODE for sliding doesn't work.
 # That is, even with a huge mu_s, the condition to slide is usually (always?) met before the hop.
 #
-# The following cases have been observed to occur from this code...
-#  • rolling without slipping -> slide -> rolling without slipping -> slide
-#  • rolling without slipping -> slide -> hop
+# The following cases have been observed to occur from this code (starting at -90 degrees)...
+#  • rolling without sliding -> slide -> rolling without sliding -> slide
+#  • rolling without sliding -> slide -> hop
 # Note that the slide phase can have the direction of friction switch one or more times.
 # I need to play around with the parameter space some more to see what else can happen!
 #
@@ -66,8 +66,9 @@ M = 1.0
 
 # initial conditions (rad and rad/s)
 # Note that straight down has alpha=0 has lots of Fn
-theta0 = radians(-90)
 omega0 = -11
+# straight down seems to be the obvious best choice experimentally and theoretically
+theta0 = radians(-90)
 
 
 
@@ -85,7 +86,7 @@ delayMultiplier = 2   # a positive integer
 
 if mu_k >= mu_s:
   print("  ERROR: your mu_k is not less than your mu_s.")
-  exit()
+  exit()   # if mu_k == mu_s, my code to find signFrict doesn't work
 
 if I > m*r*r:
   print("  ERROR: your I is larger than m r^2.")
@@ -134,7 +135,7 @@ def animate():
 
     ## get values at more consistent times
 
-    omegaMax = sqrt( ( energyFunc_RollingWithoutSlipping((theta0, omega0)) + M*g*r ) / (0.5*I + 0.5*m*r*r) )
+    omegaMax = sqrt( ( energyFunc_RollingWithoutSliding((theta0, omega0)) + M*g*r ) / (0.5*I + 0.5*m*r*r) )
     tStep_ms = round(100.0 / omegaMax)   # feel free to change numerator
     if not tStep_ms:
       tStep_ms = 1
@@ -192,7 +193,7 @@ def animate():
 
 
 #############################
-# rolling without slipping
+# rolling without sliding
 #############################
 
 
@@ -205,6 +206,9 @@ m_times_r = m*r
 
 
 
+
+
+
 ## For the following functions,
 ##   y[0] is theta; y[1] is omega, the time derivative of theta
 
@@ -214,9 +218,12 @@ def derivatives(t, y):
 def normalForce(t, y):
   return M_times_r * ( derivatives(t,y)[1] * cos(y[0]) - y[1]*y[1]*sin(y[0]) ) + weight
 
+def staticFriction(y):
+  alpha = derivatives(0,y)[1]
+  return - M_times_r * ( y[1]*y[1]*cos(y[0]) + alpha*(1+sin(y[0])) ) - m_times_r * alpha
+
 def maxFriction_minus_requiredFriction(t, y):   # static friction; magnitudes
-  alpha = derivatives(t,y)[1]
-  return mu_s * normalForce(t,y) - abs( M_times_r * ( y[1]*y[1]*cos(y[0]) + alpha*(1+sin(y[0])) ) + m_times_r * alpha )
+  return mu_s * normalForce(t,y) - abs( staticFriction(y) )
 
 normalForce.terminal = True
 maxFriction_minus_requiredFriction.terminal = True
@@ -224,12 +231,12 @@ maxFriction_minus_requiredFriction.terminal = True
 
 
 
-def energyFunc_RollingWithoutSlipping(y):   # y is [ theta, omega, ... ]
+def energyFunc_RollingWithoutSliding(y):   # y is [ theta, omega, ... ]
   return (M * r * r * (1 + sin(y[0])) + 0.5 * I + 0.5 * m * r * r) * y[1] * y[1] + M * g * r * sin(y[0])
 
 
 
-def rollWithoutSlipping(finalT, finalY):
+def rollWithoutSliding(finalT, finalY):
 
 
     ## solve the ODE!
@@ -297,7 +304,7 @@ def rollWithoutSlipping(finalT, finalY):
         print("  Nothing interesting happened before tStop.")
         print("  sum of |Δtheta| =", degrees( sum(absolute(diff(sol.y[0]))) ), "degrees")
         print("  energy needed to make it over the top is", M*g*r)
-        print("  energy =", energyFunc_RollingWithoutSlipping(sol.y[:,0]) )
+        print("  energy =", energyFunc_RollingWithoutSliding(sol.y[:,0]) )
         print()
         makePlots()
         animate()
@@ -310,7 +317,8 @@ def rollWithoutSlipping(finalT, finalY):
     print("  final α =", derivatives(finalT, finalY)[1])
     print("  final F_n =", normalForce(finalT, finalY))
     print("  final μ_s F_n - |F_fr| =", maxFriction_minus_requiredFriction(finalT, finalY))
-    print("  energies:", energyFunc_RollingWithoutSlipping(sol.y[:,0]), energyFunc_RollingWithoutSlipping(finalY))
+    print("  final F_fr =", staticFriction(finalY) )
+    print("  energies:", energyFunc_RollingWithoutSliding(sol.y[:,0]), energyFunc_RollingWithoutSliding(finalY))
     if slide:
       print("  Slide!")
     else:
@@ -330,27 +338,18 @@ def rollWithoutSlipping(finalT, finalY):
 #############################
 
 
-def trySign(signFrict):  # signFrict is integer: -1 or +1
+def bottomAcceleration(signFrict, y):
   mu = signFrict * abs(mu_k)
   ratio = (m+M)/M
   ratio2 = mu/ratio
   constTerm = mu * ratio * g_over_r
   constTerm2 = 1 + I/(M*r*r)
-  y = finalY
   s = sin(y[0])
   c = cos(y[0])
   temp = y[1]*y[1]*s
   alpha = (-mu*temp + constTerm - g_over_r*c + mu*g_over_r*s - ratio2*temp*s + temp*c/ratio) / (constTerm2 - mu*c - ratio2*s*c - s*s/ratio)
   dvxdt_over_r = mu*g_over_r + ratio2*(-temp + alpha*c) + (temp*c/s + alpha*s)/ratio
-  signFrict_calculated = - sign(alpha + dvxdt_over_r)
-  if signFrict_calculated == 0:
-    print("yikes!")
-    exit()
-  if signFrict_calculated == signFrict:
-    return True
-  return False
-
-
+  return r*(alpha + dvxdt_over_r)
 
 
 
@@ -395,9 +394,10 @@ def rollWithSliding(finalT, finalY):
 
 
 
-    # get direction of kinetic friction based on sign of initial derivative of (omega * r + v_x) once sliding
-    tempPos = trySign(+1)
-    tempNeg = trySign(-1)
+    # Get direction of kinetic friction based on sign of initial bottomAcceleration once sliding.
+    # signFrict and bottomAcceleration should have opposite signs
+    tempPos =  sign(bottomAcceleration(+1.0, finalY)) == -1    # try  signFrict = 1
+    tempNeg =  sign(bottomAcceleration(-1.0, finalY)) == 1     # try  signFrict = -1
     if tempPos and not tempNeg:
       signFrict = +1.0
     elif tempNeg and not tempPos:
@@ -411,6 +411,10 @@ def rollWithSliding(finalT, finalY):
     while slide:
 
         print("  friction direction =", signFrict)
+        print("  initial bottom acceleration =", bottomAcceleration(signFrict, finalY))
+        if sign(signFrict) != -sign(bottomAcceleration(signFrict, finalY)):   # I check this because I do:  signFrict *= -1.0
+            print("aaahhhh!")
+            exit()
 
         # pre calculate
         mu = signFrict * abs(mu_k)
@@ -475,11 +479,7 @@ def rollWithSliding(finalT, finalY):
         if solSlide.status == -1:
           print(" status is -1!")
 
-        temp = derivativesSliding(0.0, solSlide.y[:,0])
-        print("  initial α + 1/r * d(v_x)/dt =", temp[1] + temp[2]/r)    # should have sign opposite signFrict
-        if sign(signFrict) != -sign(temp[1] + temp[2]/r):   # I check this because I do:  signFrict *= -1.0
-          print("aaahhhh!")
-          exit()
+
         print("  final t =", finalT)
         print("  final θ =", str(finalY[0]) + ", so " + str(degrees(finalY[0])%360) + "°")
         print("  final ω =", finalY[1])
@@ -492,13 +492,14 @@ def rollWithSliding(finalT, finalY):
 
         slide = False
         if back:
-          print("  Back to static friction!")
           temp = maxFriction_minus_requiredFriction(finalT, finalY)
-          print("  rolling without slipping μ_s F_n - |F_fr| =", temp)
+          print("  rolling without sliding μ_s F_n - |F_fr| =", temp)
           if temp < 0.0:
-            print("  NOT rolling without slipping! The friction direction changes.")
+            print("  The friction direction changes!")
             slide = True
             signFrict *= -1.0
+          else:
+            print("  Back to static friction!")
         else:
           print("  Hop!")
         print()
@@ -605,7 +606,7 @@ def hop(finalT, finalY):
 
 
 
-# Require rolling without slipping from initial conditions
+# Require rolling without sliding from initial conditions
 print()
 if normalForce(0, (theta0,omega0)) <= 0.0:
   print("  Hopping at t=0!")
@@ -627,7 +628,7 @@ finalY = (theta0, omega0)
 
 while True:
 
-  finalT, finalY, slide = rollWithoutSlipping(finalT, finalY[0:2])   # will exit the code if nothing happens before tStop
+  finalT, finalY, slide = rollWithoutSliding(finalT, finalY[0:2])   # will exit the code if nothing happens before tStop
 
   if slide:
     finalT, finalY, back = rollWithSliding(finalT, finalY)   # will handle sign of friction changing directions
