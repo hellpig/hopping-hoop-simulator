@@ -22,9 +22,6 @@
 # Note that the slide phase can have the direction of friction switch one or more times.
 # I need to play around with the parameter space some more to see what else can happen!
 #
-# Next steps...
-#  • think about continuing after landing from hop?
-#
 # (c) 2023 Bradley Knockel
 
 
@@ -68,7 +65,7 @@ M = 1.0
 omega0 = -11
 # Straight down (-90 degrees) and straight up (90 degrees)
 #   can always start without sliding.
-# Straight down can always begin without hopping.
+# Straight down can always begin without hopping and avoids unnecessary sliding.
 # Straight down seems to be the best choice experimentally and theoretically!
 theta0 = radians(-90)
 
@@ -93,6 +90,18 @@ if mu_k >= mu_s:
 if I > m*r*r:
   print("  ERROR: your I is larger than m r^2.")
   exit()
+
+
+
+## pre calculate (these variables can be used for sliding and hopping too)
+g_over_r = g/r
+aTerm = I / (M * r * r) + m/M + 2.0   # this is a constant term in the ODE
+weight = (m+M)*g
+M_times_r = M*r
+m_times_r = m*r
+# for center of mass (CM)
+r_cm = M*r / (m+M)
+I_cm = I + M*r*r - (m+M)*r_cm*r_cm
 
 
 
@@ -197,17 +206,6 @@ def animate():
 #############################
 # rolling without sliding
 #############################
-
-
-# pre calculate (these variables can be used for sliding and hopping too)
-g_over_r = g/r
-aTerm = I / (M * r * r) + m/M + 2.0   # this is a constant term in the ODE
-weight = (m+M)*g
-M_times_r = M*r
-m_times_r = m*r
-
-
-
 
 
 
@@ -354,6 +352,10 @@ def bottomAcceleration(signFrict, y):
   return r*(alpha + dvxdt_over_r)
 
 
+# This is the mechanical energy; y is [ theta, omega, v_x, ... ]
+def energyFunc_notHopping(y):
+  return 0.5 * (I + M * r * r * cos(y[0])**2) * y[1]**2 + 0.5 * m * y[2]**2 + 0.5 * M * (-r*y[1]*sin(y[0]) + y[2])**2 + M * g * r * sin(y[0])
+
 
 def rollWithSliding(finalT, finalY):
 
@@ -386,13 +388,6 @@ def rollWithSliding(finalT, finalY):
 
     normalForceSliding.terminal = True
     speedDiff.terminal = True
-
-
-
-
-    # This is the mechanical energy; y is [ theta, omega, v_x, ... ]
-    def energyFunc_notHopping(y):
-      return 0.5 * (I + M * r * r * cos(y[0])**2) * y[1]**2 + 0.5 * m * y[2]**2 + 0.5 * M * (-r*y[1]*sin(y[0]) + y[2])**2 + M * g * r * sin(y[0])
 
 
 
@@ -530,11 +525,6 @@ def rollWithSliding(finalT, finalY):
 
 def hop(finalT, finalY):
 
-    # for center of mass (CM)
-    r_cm = M*r / (m+M)
-    I_cm = I + M*r*r - (m+M)*r_cm*r_cm
-
-
     # for center of mass (CM) initial velocity
     # Note that omega does not change from just before to just after the hop
     vx0 = - r_cm * finalY[1] * sin(finalY[0]) + finalY[2]
@@ -542,13 +532,14 @@ def hop(finalT, finalY):
 
 
 
-    # y_center is 0 when t=0 and when hoop hits the ground
+    # y_center is trivially 0 when t=0 and is zero when hoop hits the ground
     # I do not believe that there are ever more solutions than this
     def y_center(t):
       return r_cm * sin(finalY[0]) + vy0 * t - 0.5 * g * t**2 - r_cm * sin(finalY[0] + finalY[1] * t)
 
     def ay_center(t):
       return -g + r_cm * finalY[1] * finalY[1] * sin(finalY[0] + finalY[1] * t)
+    # so that the time derivative of ay_center at t=0 is positive, the hop cannot occur after M points straight up
 
     def energyFunc_Air(t):
       return 0.5 * (m + M) * (vx0 * vx0 + (vy0 - g * t)**2 ) + weight * (r_cm * sin(finalY[0]) + vy0 * t - 0.5 * g * t**2) + 0.5 * I_cm * finalY[1] * finalY[1]
@@ -581,8 +572,12 @@ def hop(finalT, finalY):
     ax[1,1].set(xlabel="t_air", ylabel="y_center")
 
 
+    finalTheta = finalY[0] + finalY[1] * t
+
     print("  time in air =", str(t) + ", guess =", bestGuess)
     print("  hits ground at t =", finalT + t)
+    print("  final θ =", str(finalTheta) + ", so " + str(degrees(finalTheta)%360) + "°")
+    print("  final v_x =", vx0 + r_cm * finalY[1] * sin(finalTheta) )
     print("  energies in air:", energyFunc_Air(linspace(0, t, num=3)))
     print()
 
@@ -598,6 +593,12 @@ def hop(finalT, finalY):
     big[2] = concatenate(( big[2], omegaAir ))
     big[3] = concatenate(( big[3], 0.0*tList ))                  # alpha
     big[4] = concatenate(( big[4], vx0 + r_cm * finalY[1] * sin(finalY[0] + finalY[1] * tList) ))   # v_x
+
+    finalT += t
+    # finalY is now [ theta, omega, vx_cm, vy_cm ]
+    finalY = [ finalTheta, finalY[1], vx0, vy0 - g*t ]
+
+    return (finalT, finalY) 
 
 
 
@@ -642,6 +643,7 @@ while True:
 
 
 hop(finalT, finalY)
+
 
 
 makePlots()
