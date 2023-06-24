@@ -65,9 +65,11 @@ mu_k = 0.1
 M = 1.0
 
 # initial conditions (rad and rad/s)
-# Note that straight down has alpha=0 has lots of Fn
 omega0 = -11
-# straight down seems to be the obvious best choice experimentally and theoretically
+# Straight down (-90 degrees) and straight up (90 degrees)
+#   can always start without sliding.
+# Straight down can always begin without hopping.
+# Straight down seems to be the best choice experimentally and theoretically!
 theta0 = radians(-90)
 
 
