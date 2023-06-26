@@ -3,8 +3,14 @@ Simulate and animate a hopping hoop! Energy conservation is confirmed throughout
 
 My only assumptions are (1) flat ground, (2), if possible, rolling-without-sliding initial velocity, and (3) the edge mass is exactly at the radius.
 
+I calculate the speeds after landing any hop. I assume that the time of the collision (the time until vy_center is 0) is negligibly small. Sometimes, another hop occurs mid landing, which I detect but do not simulate.
+
 Hopping hoop...  
 [https://youtu.be/ETRpkp03stQ](https://youtu.be/ETRpkp03stQ)
+
+Some papers care about skidding vs slipping, which I guess is found by comparing the direction of the center of the hoop's velocity, *v\_x*, to the direction of the force of kinetic friction. My code prints both directions, but I prefer to just call all of it sliding. Then, if the hoop starts with the edge mass being straight down, there are two simple cases...
+* rolling without sliding → slide → rolling without sliding → slide → ...
+* rolling without sliding → slide → hop
 
 Run the Python file, hop.py! I use Matplotlib for graphs and animation, and I use SciPy for the numerical solvers and integrators. Change the parameters in the parameter section near the top of the file!
 
