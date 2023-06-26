@@ -133,6 +133,9 @@ def makePlots():
   plt.figure()
   plt.plot( big[0], cumulative_trapezoid( big[4], x = big[0], initial = 0 ), 'k' )
   plt.title("x")
+  plt.figure()
+  plt.plot( big[0], big[4] + r*big[2], 'k' )
+  plt.title("v_bottom = v_x + r ω")
   if len(big) == 6:   # if hop happened
     plt.figure()
     plt.plot( big[0], big[5], 'k' )
@@ -779,7 +782,7 @@ def land(finalY):
     finalY = [finalY[0], omega, vx_cm + r_cm*omega*sin(finalY[0])]
 
     if hop:
-      print("  another hop occurs mid or just after landing!?")
+      print("  another hop occurs before vy_center can become zero!?")
       print()
       return (finalY, static, hop)
 
