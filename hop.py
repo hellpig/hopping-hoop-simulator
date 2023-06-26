@@ -846,7 +846,7 @@ finalT, finalY = hop(finalT, finalY)
 land(finalY)
 
 
-#makePlots()
-#animate()
+makePlots()
+animate()
 
 
