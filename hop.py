@@ -694,13 +694,15 @@ def trySlideAgain(mu_k):   # +mu_k or -mu_k is the initial friction direction bu
     c = cos(finalY[0])
     term1 = r/r_cm + s
     term2 = r_cm * (m+M) / I_cm
+    ratioA = ( mu_k + term1*term2*r_cm*(mu_k*term1-c) ) / ( -mu_k + term1*term2*r_cm*(-mu_k*term1-c) )
 
     v_bottom0 = finalY[2] + r_cm * finalY[1] * s + r * finalY[1]
 
-    # get frac, the fraction of Δ(v_bottom) that has the original friction direction
+    # get frac, the fraction of Fn's impulse that gives the original friction direction
     # A, B, and C are for quadratic equation
-    A = 2*mu_k*( c*finalY[1]*r_cm - finalY[3] + term1*term2*(c*r_cm*v_bottom0 - c*finalY[2]*r_cm - finalY[3]*r - finalY[3]*r_cm*s) )
-    B = mu_k*term1*term2 * (c*finalY[2]*r_cm - 3*c*r_cm*v_bottom0 + finalY[3]*r + finalY[3]*r_cm*s ) + c*r_cm*term2 * (c*finalY[2] - c*v_bottom0 + finalY[3]*r/r_cm + finalY[3]*s) - c*finalY[1]*mu_k*r_cm + finalY[1]*r + finalY[1]*r_cm*s + finalY[2] + finalY[3]*mu_k - v_bottom0
+    A = 2*mu_k*ratioA*( c*finalY[1]*r_cm - finalY[3] + term1*term2*(c*r_cm*v_bottom0/ratioA - c*finalY[2]*r_cm - finalY[3]*r - finalY[3]*r_cm*s) )
+    B = mu_k*term1*term2 * (c*finalY[2]*r_cm - 3*c*r_cm*v_bottom0/ratioA + finalY[3]*r + finalY[3]*r_cm*s ) + c*r_cm*term2 * (c*finalY[2] - c*v_bottom0/ratioA + finalY[3]*r/r_cm + finalY[3]*s) - c*finalY[1]*mu_k*r_cm + finalY[1]*r + finalY[1]*r_cm*s + finalY[2] + finalY[3]*mu_k - v_bottom0/ratioA
+    B *= ratioA
     C = v_bottom0 * ( c*r_cm*term2 * ( c + mu_k*term1 ) + 1.0)
     frac1 = (-B + sqrt(B**2 - 4*A*C))/(2*A)
     frac2 = (-B - sqrt(B**2 - 4*A*C))/(2*A)
@@ -723,9 +725,9 @@ def trySlideAgain(mu_k):   # +mu_k or -mu_k is the initial friction direction bu
 
     # reality check for my sanity; all printed numbers should be 0
     '''
-    Fnt = (M + m)*(-finalY[3] + vy_cm)
-    Ffrt = (M + m)*(-finalY[2] + vx_cm)
-    print( Ffrt - Fnt*mu_k*(2*frac - 1), Ffrt*term1 - Fnt*c - I_cm*(-finalY[1] + omega)/r_cm, frac*v_bottom + (1 - frac)*v_bottom0 )
+    Fnt = (M + m)*(-finalY[3] + vy_cm)   # an impulse
+    Ffrt = (M + m)*(-finalY[2] + vx_cm)  # an impulse
+    print( Ffrt - Fnt*mu_k*(2*frac - 1), Ffrt*term1 - Fnt*c - I_cm*(-finalY[1] + omega)/r_cm, frac*ratioA*v_bottom + (1 - frac)*v_bottom0 )
     '''
 
     # find F_n just after landing
@@ -844,7 +846,7 @@ finalT, finalY = hop(finalT, finalY)
 land(finalY)
 
 
-makePlots()
-animate()
+#makePlots()
+#animate()
 
 
