@@ -22,10 +22,6 @@
 # Note that the slide phase can have the direction of friction switch one or more times.
 # I need to play around with the parameter space some more to see what else can happen!
 #
-# The logic of my land() function is a bit dubious.
-# I included land() because I think it usually works, unless the normal force is negative immediately
-#   after vy_center=0 is achieved, which the code checks for.
-#
 # (c) 2023 Bradley Knockel
 
 
@@ -621,187 +617,124 @@ def hop(finalT, finalY):
 
 
 
-
-def trySlide(mu_k):   # +mu_k or -mu_k
-
-    s = sin(finalY[0])
-    c = cos(finalY[0])
-
-    term = r_cm*(m+M)/I_cm*(mu_k*(r/r_cm + s) - c)    # a part of the omega calculation
-    omega = (finalY[3]*term - finalY[1])/(c*r_cm*term - 1.0)
-
-    vy_cm = r_cm * omega * c
-    vx_cm = finalY[2] + mu_k * (vy_cm - finalY[3])
-    v_bottom = vx_cm + r_cm * omega * s + r * omega
-    v_bottom0 = finalY[2] + r_cm * finalY[1] * s + r * finalY[1]
-
-    # reality check for my sanity; all printed numbers should be 0
-    '''
-    Fnt = (M + m)*(-finalY[3] + vy_cm)
-    Ffrt = (M + m)*(-finalY[2] + vx_cm)
-    print( Ffrt - Fnt*mu_k, (r/r_cm + s)*Ffrt - Fnt*c - I_cm/r_cm*(omega-finalY[1]) )
-    '''
-
-    # find F_n just after landing
-    mu = mu_k
-    ratio = (m+M)/M
-    ratio2 = mu/ratio
-    constTerm = mu * ratio * g_over_r
-    constTerm2 = 1 + I/(M*r*r)
-    temp = omega*omega*s
-    alpha = (-mu*temp + constTerm - g_over_r*c + mu*g_over_r*s - ratio2*temp*s + temp*c/ratio) / (constTerm2 - mu*c - ratio2*s*c - s*s/ratio)
-    Fn_after = M_times_r * (alpha * c - temp) + weight
-
-    # (omega, vx_cm, did v_bottom stay same direction?, hop? )
-    return ( omega, vx_cm, sign(v_bottom)==sign(v_bottom0), Fn_after < 0.0 )
-
-
-
-def tryStopBottom():
-
-    # pre calculate
-    c = cos(finalY[0])
-    s = sin(finalY[0])
-    term1 = r/r_cm + s
-    term2 = r_cm * (m+M) / I_cm
-
-    # get omega
-    omega = (finalY[1] + c * term2 * finalY[3] - term1 * term2 * finalY[2]) / (1.0 + c**2 * term2 * r_cm + term1**2 * term2 * r_cm)
-
-    vx_cm = -r_cm * omega * s - omega * r
-
-    # reality check for my sanity
-    '''
-    vy_cm = r_cm * omega * c
-    Fnt = (M + m)*(-finalY[3] + vy_cm)
-    Ffrt = (M + m)*(-finalY[2] + vx_cm)
-    print( term1*Ffrt - Fnt*c - I_cm/r_cm*(omega-finalY[1]) )    # should be 0
-    '''
-
-    # find F_n just after landing
-    alpha = - (omega*omega + g_over_r) * c / (aTerm + 2*s)
-    Fn_after = M_times_r * ( alpha * c - omega*omega*s ) + weight
-
-    # find static F_fr after landing
-    Ffr_after = - M_times_r * ( omega*omega*c + alpha*(1+s) ) - m_times_r * alpha
-
-    # (omega, vx_cm, static after landing?, hop? )
-    return ( omega, vx_cm, mu_s * Fn_after > abs( Ffr_after ), Fn_after < 0.0 )
-
-
-
-def trySlideAgain(mu_k):   # +mu_k or -mu_k is the initial friction direction but then friction changes direction
-
-    # pre calculate
-    s = sin(finalY[0])
-    c = cos(finalY[0])
-    term1 = r/r_cm + s
-    term2 = r_cm * (m+M) / I_cm
-    ratioA = ( mu_k + term1*term2*r_cm*(mu_k*term1-c) ) / ( -mu_k + term1*term2*r_cm*(-mu_k*term1-c) )
-
-    v_bottom0 = finalY[2] + r_cm * finalY[1] * s + r * finalY[1]
-
-    # get frac, the fraction of Fn's impulse that gives the original friction direction
-    # A, B, and C are for quadratic equation
-    A = 2*mu_k*ratioA*( c*finalY[1]*r_cm - finalY[3] + term1*term2*(c*r_cm*v_bottom0/ratioA - c*finalY[2]*r_cm - finalY[3]*r - finalY[3]*r_cm*s) )
-    B = mu_k*term1*term2 * (c*finalY[2]*r_cm - 3*c*r_cm*v_bottom0/ratioA + finalY[3]*r + finalY[3]*r_cm*s ) + c*r_cm*term2 * (c*finalY[2] - c*v_bottom0/ratioA + finalY[3]*r/r_cm + finalY[3]*s) - c*finalY[1]*mu_k*r_cm + finalY[1]*r + finalY[1]*r_cm*s + finalY[2] + finalY[3]*mu_k - v_bottom0/ratioA
-    B *= ratioA
-    C = v_bottom0 * ( c*r_cm*term2 * ( c + mu_k*term1 ) + 1.0)
-    frac1 = (-B + sqrt(B**2 - 4*A*C))/(2*A)
-    frac2 = (-B - sqrt(B**2 - 4*A*C))/(2*A)
-    if 0 < frac1 < 1:
-      if 0 < frac2 < 1:
-        return (False,False,False,False)  # bazoinga!! Both work!
-      frac = frac1
-    elif 0 < frac2 < 1:
-      frac = frac2
-    else:
-      return (False,False,False,False)  # bazoinga!! Neither work!
-
-    # get omega
-    term = term2*(mu_k*term1*(2*frac-1) - c)    # a part of the omega calculation
-    omega = (-finalY[1] + finalY[3]*term)/(-1.0 + c*r_cm*term)
-
-    vy_cm = r_cm * omega * c
-    vx_cm = finalY[2] + mu_k * (2*frac - 1) * (vy_cm - finalY[3])
-    v_bottom = vx_cm + r_cm * omega * s + r * omega
-
-    # reality check for my sanity; all printed numbers should be 0
-    '''
-    Fnt = (M + m)*(-finalY[3] + vy_cm)   # an impulse
-    Ffrt = (M + m)*(-finalY[2] + vx_cm)  # an impulse
-    print( Ffrt - Fnt*mu_k*(2*frac - 1), Ffrt*term1 - Fnt*c - I_cm*(-finalY[1] + omega)/r_cm, frac*ratioA*v_bottom + (1 - frac)*v_bottom0 )
-    '''
-
-    # find F_n just after landing
-    mu = -mu_k
-    ratio = (m+M)/M
-    ratio2 = mu/ratio
-    constTerm = mu * ratio * g_over_r
-    constTerm2 = 1 + I/(M*r*r)
-    temp = omega*omega*s
-    alpha = (-mu*temp + constTerm - g_over_r*c + mu*g_over_r*s - ratio2*temp*s + temp*c/ratio) / (constTerm2 - mu*c - ratio2*s*c - s*s/ratio)
-    Fn_after = M_times_r * (alpha * c - temp) + weight
-
-    # (omega, vx_cm, did v_bottom change directions?, hop? )
-    return ( omega, vx_cm, sign(v_bottom) == -sign(v_bottom0), Fn_after < 0.0 )
-
-
-
-
-
+# instead of time, track omega, vx_cm, and vy_cm using vertical impulse on combined mass (Fnt)
 def land(finalY):
 
-    v_bottom0 = finalY[2] + r_cm * finalY[1] * sin(finalY[0]) + r * finalY[1]
-    signFrict = -sign(v_bottom0)   # initially at least
 
-    trySlideSimple = trySlide(signFrict * abs(mu_k))
-    tryStop = tryStopBottom()
-    trySlideComplex = trySlideAgain(signFrict * abs(mu_k))
+    s = sin(finalY[0])
+    c = cos(finalY[0])
+    term1 = r/r_cm + s
+    term2 = r_cm * (m+M) / I_cm
+
+    dVy_dImpulse = 1/(m+M)
+    staticPossible =  mu_s > abs( c*r_cm*term1*term2 / (1 + term2*r_cm*term1**2) )
+    #print(abs( c*r_cm*term1*term2 / (1 + term2*r_cm*term1**2) ))
+
+
+    def rollWithoutSliding(omega, vx_cm, vy_cm):
+        dOmega_dImpulse = c*r_cm/I_cm * ( r_cm*term1**2*term2 / (1 + term2*r_cm*term1**2) - 1 )
+        dVx_dImpulse = c*r_cm**2*term1 / (I_cm + (M+m)*r_cm**2*term1**2)
+        Fnt = (r_cm*c*omega - vy_cm) / (dVy_dImpulse - r_cm*c*dOmega_dImpulse)   # when vy_center = 0
+
+        omega += dOmega_dImpulse * Fnt
+        vx_cm += dVx_dImpulse * Fnt
+        vy_cm += dVy_dImpulse * Fnt
+
+        return (omega, vx_cm, vy_cm)
+
+
+
+
+    print("  Landing!")
+
+
+    omega = finalY[1]
+    vx_cm = finalY[2]
+    vy_cm = finalY[3]
+
+    v_bottom0 = vx_cm + r_cm * omega * s + r * omega
+    signFrict = -sign(v_bottom0)   # initially at least
+    #print(signFrict)
+
+    mu = signFrict * abs(mu_k)
+    dOmega_dImpulse = r_cm/I_cm * (mu * term1 - c)
+    dVx_dImpulse = mu/(m+M)
+    FntCenterStop = (r_cm*c*omega - vy_cm) / (dVy_dImpulse - r_cm*c*dOmega_dImpulse)          # when vy_center = 0
+    FntBottomStop = (-r_cm*term1*omega - vx_cm) / (r_cm*term1*dOmega_dImpulse + dVx_dImpulse)      # when v_bottom = 0
 
     static = False
-    print("  Landing!")
-    if trySlideSimple[2]:
-      print("  kinetic friction direction =", signFrict)
-      omega, vx_cm, _, hop = trySlideSimple
-    elif tryStop[2]:
-      print("  v_bottom becomes 0")
-      omega, vx_cm, _, hop = tryStop
-      static = True
-    elif trySlideComplex[2]:
-      print("  kinetic friction initial but not final direction =", signFrict)
-      omega, vx_cm, _, hop = trySlideComplex
+    if  FntBottomStop > 0  and  FntBottomStop < FntCenterStop:
+
+        omega += dOmega_dImpulse * FntBottomStop
+        vx_cm += dVx_dImpulse * FntBottomStop
+        vy_cm += dVy_dImpulse * FntBottomStop
+        #print("v_bottom =", vx_cm + r_cm*omega*s + r*omega)   # should be 0
+
+        if staticPossible:
+            omega, vx_cm, vy_cm = rollWithoutSliding(omega, vx_cm, vy_cm)
+            #print("v_y =", vy_cm - r_cm*omega*c)   # should be 0
+
+            # see if it will be static AFTER landing
+            alpha = - (omega*omega + g_over_r) * c / (aTerm + 2*s)
+            normalForce = M_times_r * ( alpha * c - omega*omega*s ) + weight
+            staticFriction = - M_times_r * ( omega*omega*c + alpha*(1+s) ) - m_times_r * alpha
+            if mu_s * normalForce > abs( staticFriction ):
+              print("  Rolling without sliding will occur after landing")    # can this happen?
+              static = True
+            else:
+              print("  Rolling without sliding occurred during landing but will not continue after landing")
+
+        else:    # kinetic friction changes direction
+            print("  Kinetic friction changed directions mid landing")
+            mu *= -1
+            dOmega_dImpulse = r_cm/I_cm * (mu * term1 - c)
+            dVx_dImpulse = mu/(m+M)
+            FntCenterStop = (r_cm*c*omega - vy_cm) / (dVy_dImpulse - r_cm*c*dOmega_dImpulse)   # when vy_center = 0
+
+            omega += dOmega_dImpulse * FntCenterStop
+            vx_cm += dVx_dImpulse * FntCenterStop
+            vy_cm += dVy_dImpulse * FntCenterStop
+            #print("v_y =", vy_cm - r_cm*omega*c)   # should be 0
+
     else:
-      print("ERROR")
-      print(trySlideSimple)
-      print(tryStop)
-      print(trySlideComplex)
-      exit()
+        omega += dOmega_dImpulse * FntCenterStop
+        vx_cm += dVx_dImpulse * FntCenterStop
+        vy_cm += dVy_dImpulse * FntCenterStop
+        #print("v_y =", vy_cm - r_cm*omega*c)   # should be 0
 
 
-    finalY = [finalY[0], omega, vx_cm + r_cm*omega*sin(finalY[0])]
-
-    if hop:
-      print("  another hop occurs before vy_center can become zero!?")
-      print()
-      return (finalY, static, hop)
+    finalY = [finalY[0], omega, vx_cm + r_cm*omega*s]
 
 
     print("  final ω =", omega)
     print("  final v_x =", finalY[2])
 
-    # Should be 0 if and only if v_bottom = 0 solution was used
-    # If not 0, should have sign opposite sign of friction
+    # Should be 0 if and only if it ends rolling without sliding
+    # If not 0 and kinetic friction never changed direction, should have sign opposite sign of friction
     print("  final r ω + v_x =", r*omega + finalY[2] )
 
     print("  energy =", energyFunc_notHopping(finalY))
-    if static:
-      print("  Rolling without sliding!")
-    else:
-      print("  Sliding!")
+
+
+    hop = False
+    if not static:
+        ratio = (m+M)/M
+        ratio2 = mu/ratio
+        constTerm = mu * ratio * g_over_r
+        constTerm2 = 1 + I/(M*r*r)
+
+        temp = omega*omega*s
+        alpha = (-mu*temp + constTerm - g_over_r*c + mu*g_over_r*s - ratio2*temp*s + temp*c/ratio) / (constTerm2 - mu*c - ratio2*s*c - s*s/ratio)
+        Fn = M_times_r * (alpha * c - temp) + weight
+        if Fn < 0:
+          print("  Hop! Initial ay_center won't be 0")
+          hop = True
+
+
     print()
 
     return (finalY, static, hop)
+
 
 
 
@@ -829,7 +762,7 @@ big = [ [] for i in range(5) ]
 
 # initialize
 finalT = 0.0
-finalY = (theta0, omega0)
+finalY = (theta0, omega0)    # the exact contents of finalY changes throughout
 
 while True:
 
