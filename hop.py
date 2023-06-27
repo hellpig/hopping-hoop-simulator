@@ -634,20 +634,23 @@ From Newton's 2nd law in y direction:
 From Newton's 2nd law in x direction:
   d(vx_cm)/dFnt = F_fr/F_n / (m+M)
 From Newton's 2nd law for rotation:
-  dω/dFnt = r_cm/I_cm * (-cosθ + F_fr/F_n * (r/r_cm + sinθ))
+  dω/dFnt = r_cm/I_cm * (F_fr/F_n * (r/r_cm + sinθ) - cosθ)
 Note that F_fr/F_n is ±mu_k if there is kinetic friction.
-Even if rolling without slipping, these 3 derivatives are constants.
+Even if rolling without sliding, these 3 derivatives are constants.
 
 Define term1 and term2 as follows...
   term1 = (r/r_cm + sinθ)
   term2 = r_cm * (m+M) / I_cm
-α is...
-  α = r_cm/I_cm (-F_n cosθ + F_fr term1)
+Angular acceleration is...
+  α = r_cm/I_cm (F_fr term1 - F_n cosθ)
 
-If rolling without slipping...
+If rolling without sliding...
   vx_cm = -ω r_cm term1
   F_fr = (m+M) d(vx_cm)/dt = -(m+M) α r_cm term1 = -term2 (F_fr term1 - F_n cosθ) r_cm term1
 You can then solve for F_fr / F_n, which is a constant.
+If it bothers you that term1 is treated like a constant, you are welcome to use the product
+  rule when taking its derivate, but then drop the ω^2 / F_n term because it is negligible
+  compared to other terms when F_fr and F_n approach infinity.
 '''
 
 def land(finalY):
