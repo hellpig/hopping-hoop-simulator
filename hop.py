@@ -17,8 +17,8 @@
 # That is, even with a huge mu_s, the condition to slide is usually (always?) met before the hop.
 #
 # The following cases have been observed to occur from this code (starting at -90 degrees)...
-#  • rolling without sliding ⇒ slide ⇒ rolling without sliding ⇒ slide ⇒ …
-#  • rolling without sliding ⇒ slide ⇒ hop
+#  • rolling without sliding → slide → rolling without sliding → slide → …
+#  • rolling without sliding → slide → hop
 # Note that the slide phase can have the direction of friction switch one or more times.
 # I need to play around with the parameter space some more to see what else can happen!
 #
@@ -62,7 +62,7 @@ mu_k = 0.1
 M = 1.0
 
 # initial conditions (rad and rad/s)
-omega0 = -11
+omega0 = -15
 # Straight down (-90 degrees) and straight up (90 degrees) are great because they
 #   can always start without sliding, and make the sign of omega0 trivial.
 # Straight down can always begin without hopping and avoids unnecessary sliding.
@@ -132,7 +132,7 @@ def makePlots():
   plt.figure()
   plt.plot( big[0], big[4] + r*big[2], 'k' )
   plt.title("v_bottom = v_x + r ω")
-  if len(big) == 6:   # if hop happened
+  if hopCount:
     plt.figure()
     plt.plot( big[0], big[5], 'k' )
     plt.title("y")
@@ -158,17 +158,14 @@ def animate():
     tNew = arange(0.0, big[0][-1], tStep)
     thetaNew = interp( tNew, big[0], big[1] )
     xNew = interp( tNew, big[0], x_pos )
-    if len(big) == 6:   # if hop happened
-      yNew = interp( tNew, big[0], big[5] )
-    else:
-      yNew = 0.0*tNew
+    yNew = interp( tNew, big[0], big[5] )
 
 
-    coordsList = [(xNew[i],yNew[i],xNew[i]+r*cos(thetaNew[i]),yNew[i]+r*sin(thetaNew[i])) for i in range(len(tNew))]
+    coordsList = [(xNew[i],yNew[i],xNew[i]+r*cos(thetaNew[i]),yNew[i]+r*sin(thetaNew[i]),xNew[i]+r_cm*cos(thetaNew[i]),yNew[i]+r_cm*sin(thetaNew[i])) for i in range(len(tNew))]
 
 
     # setup figure
-    pad = 0.5         # prevents edge of hoop from sometimes being chopped off
+    pad = 1           # prevents edge of hoop from sometimes being chopped off
     maxInches = 8     # feel free to change!
     xRange = [ min(xNew) - (1+pad)*r, max(xNew) + (1+pad)*r ]
     yRange = [ -(1+pad)*r, max(yNew) + (1+pad)*r ]
@@ -178,15 +175,17 @@ def animate():
     fig = plt.figure( figsize=(scale*xDelta, scale*yDelta) )
     board = plt.axes(xlim=xRange, ylim=yRange, frameon=False)
     board.axis('off')
-    circle = plt.Circle((0.0, 0.0), r, fill=False, color='b')
-    arrow, = board.plot([0.0, r*cos(thetaNew[0])], [0.0, r*sin(thetaNew[0])], 'b' ) 
+    circle = plt.Circle((0.0, 0.0), r, fill=False, color='k')
+    arrow, = board.plot([0.0, r*cos(thetaNew[0])], [0.0, r*sin(thetaNew[0])], 'k' )
+    dot, = board.plot([r_cm*cos(thetaNew[0])], [r_cm*sin(thetaNew[0])], 'm.' )    # marks the center of mass
     board.add_patch(circle)
 
 
     def animateFrame(coords):
         circle.set( center = (coords[0], coords[1]) )
         arrow.set_data([coords[0], coords[2]], [coords[1], coords[3]])
-        return [circle, arrow]
+        dot.set_data([coords[4]], [coords[5]])
+        return [circle, arrow, dot]
 
 
 
@@ -263,6 +262,7 @@ def rollWithoutSliding(finalT, finalY):
     # update the graph
     ax[0,0].plot(sol.t, theta, 'k-', sol.t, sol.y[1], 'r--', sol.t, alpha, 'bs', sol.t, Fn, 'g^', sol.t, maxMinusFriction, 'm+')
     ax[0,0].set(xlabel="t")
+    ax[0,0].set_title("not sliding")
     ax[0,0].legend(['θ mod 2π','ω','α','F_n','max - |frict|'])
 
 
@@ -273,6 +273,7 @@ def rollWithoutSliding(finalT, finalY):
     big[2] = concatenate(( big[2], sol.y[1] )) # omega
     big[3] = concatenate(( big[3], alpha ))    # alpha
     big[4] = concatenate(( big[4], -r*sol.y[1] ))  # v_x
+    big[5] = concatenate(( big[5], 0.0*sol.t ))    # v_y
 
 
 
@@ -342,7 +343,7 @@ def rollWithoutSliding(finalT, finalY):
 
 
 def bottomAcceleration(signFrict, y):
-  mu = signFrict * abs(mu_k)
+  mu = signFrict * mu_k
   ratio = (m+M)/M
   ratio2 = mu/ratio
   constTerm = mu * ratio * g_over_r
@@ -393,18 +394,21 @@ def rollWithSliding(finalT, finalY):
     speedDiff.terminal = True
 
 
-
-    # Get direction of kinetic friction based on sign of initial bottomAcceleration once sliding.
-    # signFrict and bottomAcceleration should have opposite signs
-    tempPos =  sign(bottomAcceleration(+1.0, finalY)) == -1    # try  signFrict = 1
-    tempNeg =  sign(bottomAcceleration(-1.0, finalY)) == 1     # try  signFrict = -1
-    if tempPos and not tempNeg:
-      signFrict = +1.0
-    elif tempNeg and not tempPos:
-      signFrict = -1.0
-    else:
-      print("weird...", tempPos, tempNeg)
-      exit()  
+    if rollingWithoutSliding:
+      # Get direction of kinetic friction based on sign of initial bottomAcceleration once sliding.
+      # signFrict and bottomAcceleration should have opposite signs
+      # Note that v_bottom is 0, so you can't use that to get signFrict.
+      tempPos =  sign(bottomAcceleration(+1.0, finalY)) == -1    # try  signFrict = 1
+      tempNeg =  sign(bottomAcceleration(-1.0, finalY)) == 1     # try  signFrict = -1
+      if tempPos and not tempNeg:
+        signFrict = +1.0
+      elif tempNeg and not tempPos:
+        signFrict = -1.0
+      else:
+        print("weird...", tempPos, tempNeg)
+        exit()
+    else:   # landing a hop then immediately sliding
+      signFrict = -sign(r*finalY[1] + finalY[2])
 
 
     slide = True
@@ -412,12 +416,9 @@ def rollWithSliding(finalT, finalY):
 
         print("  friction direction =", signFrict)
         print("  initial bottom acceleration =", bottomAcceleration(signFrict, finalY))
-        if sign(signFrict) != -sign(bottomAcceleration(signFrict, finalY)):   # I check this because I do:  signFrict *= -1.0
-            print("aaahhhh!")
-            exit()
 
         # pre calculate
-        mu = signFrict * abs(mu_k)
+        mu = signFrict * mu_k
         ratio = (m+M)/M
         ratio2 = mu/ratio
         constTerm = mu * ratio * g_over_r
@@ -425,7 +426,8 @@ def rollWithSliding(finalT, finalY):
 
         eventTuple = (normalForceSliding, speedDiff)
 
-        tStop = 10/abs(finalY[1])   # feel free to change!
+        tStop = 10/abs(finalY[1])   # feel free to change the 10!  
+        tStop += 2*abs(r*finalY[1] + finalY[2])/(mu_k * g)     # feel free to change the 2! Only does anything if landing a hop then immediately sliding
         tList = linspace(finalT, finalT + tStop, num=101)   # nice for making plot; feel free to change num
 
         solSlide = solve_ivp(derivativesSliding, (finalT, finalT + tStop), (finalY[0],finalY[1],finalY[2],0.0), method = 'Radau', atol = abs_tol, events = eventTuple, t_eval = tList)
@@ -442,6 +444,7 @@ def rollWithSliding(finalT, finalY):
         # update graph
         ax[0,1].plot(solSlide.t, thetaSlide, 'k-', solSlide.t, solSlide.y[1], 'r--', solSlide.t, alphaSlide, 'bs', solSlide.t, FnSlide, 'g^', solSlide.t, speedDiffArray, 'm+')
         ax[0,1].set(xlabel="t")
+        ax[0,1].set_title("sliding")
         ax[0,1].legend(['θ mod 2π','ω','α','F_n','r ω + v_x'])
 
 
@@ -473,7 +476,7 @@ def rollWithSliding(finalT, finalY):
             finalT = finalT_hop
             finalY = finalY_hop
         else:   # neither
-            print("  Make tStop in rollWithSliding() longer.")
+            print("  Make tStop in rollWithSliding() longer.", solSlide.t[-1], solSlide.y[:,-1])
             exit()
 
         if solSlide.status == -1:
@@ -498,6 +501,9 @@ def rollWithSliding(finalT, finalY):
             print("  The friction direction changes!")
             slide = True
             signFrict *= -1.0
+            if sign(signFrict) != -sign(bottomAcceleration(signFrict, finalY)):
+              print("aaahhhh!")
+              exit()
           else:
             print("  Back to static friction!")
         else:
@@ -505,12 +511,12 @@ def rollWithSliding(finalT, finalY):
         print()
 
 
-
         big[0] = concatenate(( big[0], solSlide.t ))     # t
         big[1] = concatenate(( big[1], solSlide.y[0] ))  # theta
         big[2] = concatenate(( big[2], solSlide.y[1] ))  # omega
         big[3] = concatenate(( big[3], alphaSlide ))     # alpha
         big[4] = concatenate(( big[4], solSlide.y[2] ))  # v_x
+        big[5] = concatenate(( big[5], 0.0*solSlide.t )) # v_y
 
 
 
@@ -542,7 +548,8 @@ def hop(finalT, finalY):
 
     def ay_center(t):
       return -g + r_cm * finalY[1] * finalY[1] * sin(finalY[0] + finalY[1] * t)
-    # so that the time derivative of ay_center at t=0 is positive, the hop cannot occur after M points straight up
+    # I believe that this has to be 0 if hop occurs not just after landing.
+    #   So that the time derivative of ay_center at t=0 is positive, the hop cannot occur after M points straight up
 
     def energyFunc_Air(t):
       return 0.5 * (m + M) * (vx0 * vx0 + (vy0 - g * t)**2 ) + weight * (r_cm * sin(finalY[0]) + vy0 * t - 0.5 * g * t**2) + 0.5 * I_cm * finalY[1] * finalY[1]
@@ -551,9 +558,11 @@ def hop(finalT, finalY):
 
     temp = ay_center(0)
     print("  initial ay_center =", temp )  # should not be negative
-    if not isclose(temp, 0.0, atol = abs_tol):   # I think it even has to be 0!?
+    '''
+    if not isclose(temp, 0.0, atol = abs_tol):
       print("oh no!")
       exit()
+    '''
 
 
 
@@ -570,9 +579,11 @@ def hop(finalT, finalY):
 
 
     # make graph
-    tList = linspace(0.0, 1.25*t, num=101)      # feel free to change num and the final time
-    ax[1,1].plot(tList, y_center(tList), 'r-', t, y_center(t), 'r.', tList, 0.0*tList, 'k-')
-    ax[1,1].set(xlabel="t_air", ylabel="y_center")
+    if hopCount < 2:
+      tList = linspace(0.0, 1.25*t, num=101)      # feel free to change num and the final time
+      ax[1,hopCount].plot(tList, y_center(tList), 'r-', t, y_center(t), 'r.', tList, 0.0*tList, 'k-')
+      ax[1,hopCount].set(xlabel="t_air", ylabel="y_center")
+      ax[1,hopCount].set_title("hop " + str(hopCount+1))
 
 
     finalTheta = finalY[0] + finalY[1] * t
@@ -590,13 +601,13 @@ def hop(finalT, finalY):
     tList = linspace(0.0, t, num=101)    # feel free to change num
     omegaAir = tList*0.0 + finalY[1]
     thetaAir = finalY[0] + omegaAir*tList
-
-    big.append( concatenate(( big[0]*0.0, y_center(tList) )) )   # y_pos
+      
     big[0] = concatenate(( big[0], finalT + tList ))
     big[1] = concatenate(( big[1], thetaAir ))
     big[2] = concatenate(( big[2], omegaAir ))
     big[3] = concatenate(( big[3], 0.0*tList ))                  # alpha
     big[4] = concatenate(( big[4], vx0 + r_cm * finalY[1] * sin(finalY[0] + finalY[1] * tList) ))   # v_x
+    big[5] = concatenate(( big[5], y_center(tList) ))
 
     finalT += t
     # finalY is now [ theta, omega, vx_cm, vy_cm ]
@@ -677,7 +688,7 @@ def land(finalY):
     signFrict = -sign(v_bottom0)   # initially at least
     #print(signFrict)
 
-    mu = signFrict * abs(mu_k)
+    mu = signFrict * mu_k
     dOmega_dImpulse = r_cm/I_cm * (mu * term1 - c)
     dVx_dImpulse = mu/(m+M)
     FntCenterStop = (r_cm*c*omega - vy_cm) / (dVy_dImpulse - r_cm*c*dOmega_dImpulse)          # Fnt when vy_center = vy_cm - r_cm*omega*c = 0
@@ -757,6 +768,7 @@ def land(finalY):
 
     print()
 
+
     return (finalY, static, hop)
 
 
@@ -780,30 +792,44 @@ if maxFriction_minus_requiredFriction(0, (theta0,omega0)) <= 0.0:
 
 
 # big is a 2D list that continuously grows as the code executes
-#   [ time, theta, omega, alpha, v_x ]
-big = [ [] for i in range(5) ]
+#   [ time, theta, omega, alpha, v_x, v_y ]
+# The alpha during landing is not entered into big[3]
+big = [ [] for i in range(6) ]
 
 
 # initialize
 finalT = 0.0
 finalY = (theta0, omega0)    # length of finalY will change
+hopCount = 0
 
+
+
+rollingWithoutSliding = True
 while True:
 
-  finalT, finalY, slide = rollWithoutSliding(finalT, finalY[0:2])   # will exit the code if nothing happens before tStop
+    while True:
 
-  if slide:
-    finalT, finalY, back = rollWithSliding(finalT, finalY)   # will handle sign of friction changing directions
-  else:      # hop
-    break
+      if rollingWithoutSliding:
+          finalT, finalY, slide = rollWithoutSliding(finalT, finalY[0:2])   # will exit the code if nothing happens before tStop
 
-  if not back:   # hop
-    break
+      if slide:
+          finalT, finalY, back = rollWithSliding(finalT, finalY)   # will handle sign of friction changing directions
+      else:      # hop
+          break
+      
+      if not back:   # hop
+          break
+      rollingWithoutSliding = True
 
 
-finalT, finalY = hop(finalT, finalY)
+    hopping = True
+    while hopping:
 
-land(finalY)
+        finalT, finalY = hop(finalT, finalY)
+        hopCount += 1
+
+        finalY, rollingWithoutSliding, hopping = land(finalY)
+
 
 
 makePlots()
