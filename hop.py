@@ -17,8 +17,8 @@
 # That is, even with a huge mu_s, the condition to slide is usually (always?) met before the hop.
 #
 # The following cases have been observed to occur from this code (starting at -90 degrees)...
-#  • rolling without sliding -> slide -> rolling without sliding -> slide
-#  • rolling without sliding -> slide -> hop
+#  • rolling without sliding ⇒ slide ⇒ rolling without sliding ⇒ slide ⇒ …
+#  • rolling without sliding ⇒ slide ⇒ hop
 # Note that the slide phase can have the direction of friction switch one or more times.
 # I need to play around with the parameter space some more to see what else can happen!
 #
@@ -610,14 +610,35 @@ def hop(finalT, finalY):
 #############################
 # land
 #############################
-#
-# Assume that the time of the collision (the time until vy_center is 0) is negligibly small.
-#
-# Energy confirmation is not confirmed here
 
+'''
+Assume that the time of the collision (the time until vy_center is 0) is negligibly small.
+This means that θ is constant and the force of gravity can be ignored.
 
+Energy confirmation is not confirmed here
 
-# instead of time, track omega, vx_cm, and vy_cm using vertical impulse on combined mass (Fnt)
+Instead of time, track omega, vx_cm, and vy_cm using vertical impulse on combined mass (Fnt).
+From Newton's 2nd law in y direction:
+  d(vy_cm)/dFnt = 1/(m+M)
+From Newton's 2nd law in x direction:
+  d(vx_cm)/dFnt = F_fr/F_n / (m+M)
+From Newton's 2nd law for rotation:
+  dω/dFnt = r_cm/I_cm * (-cosθ + F_fr/F_n * (r/r_cm + sinθ))
+Note that F_fr/F_n is ±mu_k if there is kinetic friction.
+Even if rolling without slipping, these 3 derivatives are constants.
+
+Define term1 and term2 as follows...
+  term1 = (r/r_cm + sinθ)
+  term2 = r_cm * (m+M) / I_cm
+α is...
+  α = r_cm/I_cm (-F_n cosθ + F_fr term1)
+
+If rolling without slipping...
+  vx_cm = -ω r_cm term1
+  F_fr = (m+M) d(vx_cm)/dt = -(m+M) α r_cm term1 = -term2 (F_fr term1 - F_n cosθ) r_cm term1
+You can then solve for F_fr / F_n, which is a constant.
+'''
+
 def land(finalY):
 
 
@@ -659,8 +680,8 @@ def land(finalY):
     mu = signFrict * abs(mu_k)
     dOmega_dImpulse = r_cm/I_cm * (mu * term1 - c)
     dVx_dImpulse = mu/(m+M)
-    FntCenterStop = (r_cm*c*omega - vy_cm) / (dVy_dImpulse - r_cm*c*dOmega_dImpulse)          # when vy_center = 0
-    FntBottomStop = (-r_cm*term1*omega - vx_cm) / (r_cm*term1*dOmega_dImpulse + dVx_dImpulse)      # when v_bottom = 0
+    FntCenterStop = (r_cm*c*omega - vy_cm) / (dVy_dImpulse - r_cm*c*dOmega_dImpulse)          # Fnt when vy_center = vy_cm - r_cm*omega*c = 0
+    FntBottomStop = (-r_cm*term1*omega - vx_cm) / (r_cm*term1*dOmega_dImpulse + dVx_dImpulse) # Fnt when v_bottom = r*omega + vx_cm + r_cm*omega*s = 0
 
     static = False
     if  FntBottomStop > 0  and  FntBottomStop < FntCenterStop:
@@ -674,7 +695,8 @@ def land(finalY):
             omega, vx_cm, vy_cm = rollWithoutSliding(omega, vx_cm, vy_cm)
             #print("v_y =", vy_cm - r_cm*omega*c)   # should be 0
 
-            # see if it will be static AFTER landing
+            # See if it will be static AFTER landing
+            # This staticFriction calculation is basically copied and pasted from previous rolling without sliding code
             alpha = - (omega*omega + g_over_r) * c / (aTerm + 2*s)
             normalForce = M_times_r * ( alpha * c - omega*omega*s ) + weight
             staticFriction = - M_times_r * ( omega*omega*c + alpha*(1+s) ) - m_times_r * alpha
@@ -686,6 +708,8 @@ def land(finalY):
 
         else:    # kinetic friction changes direction
             print("  Kinetic friction changed directions mid landing")
+
+            # do the same calculations but with opposite mu
             mu *= -1
             dOmega_dImpulse = r_cm/I_cm * (mu * term1 - c)
             dVx_dImpulse = mu/(m+M)
@@ -717,7 +741,7 @@ def land(finalY):
 
 
     hop = False
-    if not static:
+    if not static:   # this Fn calculation is basically copied and pasted from previous sliding code
         ratio = (m+M)/M
         ratio2 = mu/ratio
         constTerm = mu * ratio * g_over_r
@@ -762,7 +786,7 @@ big = [ [] for i in range(5) ]
 
 # initialize
 finalT = 0.0
-finalY = (theta0, omega0)    # the exact contents of finalY changes throughout
+finalY = (theta0, omega0)    # length of finalY will change
 
 while True:
 
