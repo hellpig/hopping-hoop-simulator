@@ -3,7 +3,7 @@ Simulate and animate a hopping hoop! Energy conservation is confirmed throughout
 
 My only assumptions are (1) flat ground, (2), if possible, rolling-without-sliding initial velocity, and (3) the edge mass is exactly at the radius.
 
-I calculate the speeds after landing any hop. I assume that the time of the collision (the time until vy_center is 0) is negligibly small. Sometimes, another hop occurs mid landing, which I detect but do not simulate.
+I calculate the speeds after landing any hop. I assume that the time of the collision (the time until vy_center is 0) is negligibly small. Sometimes, another hop occurs just after landing, which I detect but do not simulate.
 
 Hopping hoop...  
 [https://youtu.be/ETRpkp03stQ](https://youtu.be/ETRpkp03stQ)
