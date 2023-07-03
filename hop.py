@@ -60,8 +60,8 @@ M = 1.0
 # initial conditions (rad and rad/s)
 omega0 = -11
 # Straight down (-90 degrees) and straight up (90 degrees) are great because they
-#   can always start without sliding, and make the sign of omega0 trivial.
-# Straight down can always begin without hopping and avoids unnecessary sliding.
+#   make the sign of omega0 trivial.
+# Straight down can always begin without sliding and avoids any unnecessary sliding before any hop.
 # When m is very small, straight up has a more meaningful omega0 than straight down does.
 theta0 = radians(-90)
 
@@ -684,7 +684,7 @@ def land(finalY):
             normalForce = M_times_r * ( alpha * c - omega*omega*s ) + weight
             staticFriction = - M_times_r * ( omega*omega*c + alpha*(1+s) ) - m_times_r * alpha
             if mu_s * normalForce > abs( staticFriction ):
-              print("  Rolling without sliding will occur after landing")    # can this happen?
+              print("  Rolling without sliding will occur after landing")
               static = True
             else:
               print("  Rolling without sliding occurred during landing but will not continue after landing")
@@ -779,15 +779,14 @@ hopCount = 0
 rollingWithoutSliding = True
 while True:
 
-    while True:
+    rolling = True
+    while rolling:
 
       if rollingWithoutSliding:
           finalT, finalY = rollWithoutSliding(finalT, finalY[0:2])   # will exit the code if nothing happens before tStop
 
-      finalT, finalY, back = rollWithSliding(finalT, finalY)   # will handle the sign of friction changing directions
-      
-      if not back:   # hop
-          break
+      finalT, finalY, rolling = rollWithSliding(finalT, finalY)   # will handle the sign of friction changing directions
+
       rollingWithoutSliding = True
 
 
@@ -801,7 +800,7 @@ while True:
 
 
 
-makePlots()
-animate()
+#makePlots()
+#animate()
 
 
