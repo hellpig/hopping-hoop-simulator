@@ -93,9 +93,9 @@ if I > m*r*r:
 
 
 
-## pre calculate (these variables can be used for sliding and hopping too)
+## pre calculate
 g_over_r = g/r
-aTerm = I / (M * r * r) + m/M + 2.0   # this is a constant term in the ODE
+aTerm = I / (M * r * r) + m/M + 2.0   # this is a constant term in the rolling without sliding ODE
 weight = (m+M)*g
 M_times_r = M*r
 m_times_r = m*r
@@ -331,7 +331,7 @@ def rollWithoutSliding(finalT, finalY):
 
 
     # add on v_x
-    finalY = concatenate( (finalY,  [ - r * finalY[1] ] ) )
+    finalY = concatenate(( finalY,  [ - r * finalY[1] ] ))
 
     return (finalT, finalY, slide)
 
@@ -649,7 +649,7 @@ If rolling without sliding...
   F_fr = (m+M) d(vx_cm)/dt = -(m+M) α r_cm term1 = -term2 (F_fr term1 - F_n cosθ) r_cm term1
 You can then solve for F_fr / F_n, which is a constant.
 If it bothers you that term1 is treated like a constant, you are welcome to use the product
-  rule when taking its derivate, but then drop the ω^2 / F_n term because it is negligible
+  rule when taking the derivate, but then drop the ω^2 / F_n term because it is negligible
   compared to other terms when F_fr and F_n approach infinity.
 '''
 
@@ -698,7 +698,7 @@ def land(finalY):
     FntBottomStop = (-r_cm*term1*omega - vx_cm) / (r_cm*term1*dOmega_dImpulse + dVx_dImpulse) # Fnt when v_bottom = r*omega + vx_cm + r_cm*omega*s = 0
 
     static = False
-    if  FntBottomStop > 0  and  FntBottomStop < FntCenterStop:
+    if  FntBottomStop > 0  and  FntBottomStop < FntCenterStop:   # v_bottom = 0 before the center's vertical velocity goes to 0
 
         omega += dOmega_dImpulse * FntBottomStop
         vx_cm += dVx_dImpulse * FntBottomStop
@@ -818,6 +818,7 @@ while True:
       if slide:
           finalT, finalY, back = rollWithSliding(finalT, finalY)   # will handle sign of friction changing directions
       else:      # hop
+          print("wowzers!! Hop without sliding!!!")
           break
       
       if not back:   # hop
