@@ -12,10 +12,6 @@
 # theta points to the mass on edge of hoop from the center of the hoop.
 # theta=0 points to the right.
 #
-# I believe that sliding is at least sometimes necessary before a hop for the math to be consistent!
-# That is, not checking the rolling-without-sliding ODE for sliding doesn't work.
-# That is, even with a huge mu_s, the condition to slide is usually (always?) met before the hop.
-#
 # The following cases have been observed to occur from this code (starting at -90 degrees)...
 #  • rolling without sliding → slide → rolling without sliding → slide → …
 #  • rolling without sliding → slide → hop
@@ -62,7 +58,7 @@ mu_k = 0.1
 M = 1.0
 
 # initial conditions (rad and rad/s)
-omega0 = -15
+omega0 = -11
 # Straight down (-90 degrees) and straight up (90 degrees) are great because they
 #   can always start without sliding, and make the sign of omega0 trivial.
 # Straight down can always begin without hopping and avoids unnecessary sliding.
@@ -227,7 +223,6 @@ def staticFriction(y):
 def maxFriction_minus_requiredFriction(t, y):   # static friction; magnitudes
   return mu_s * normalForce(t,y) - abs( staticFriction(y) )
 
-normalForce.terminal = True
 maxFriction_minus_requiredFriction.terminal = True
 
 
@@ -243,7 +238,7 @@ def rollWithoutSliding(finalT, finalY):
 
     ## solve the ODE!
 
-    eventTuple = (normalForce, maxFriction_minus_requiredFriction)
+    eventTuple = (maxFriction_minus_requiredFriction)
 
     tStop = 10/abs(finalY[1])   # feel free to change!
     tList = linspace(finalT, finalT + tStop, num=101)   # nice for making plot; feel free to change num
@@ -277,34 +272,11 @@ def rollWithoutSliding(finalT, finalY):
 
 
 
-    finalT_hop = False
+    # sort out if you slide or don't
     if sol.t_events[0].size:
-        finalT_hop = sol.t_events[0][0]
-        finalY_hop = sol.y_events[0][0]
-
-    finalT_slide = False
-    if sol.t_events[1].size:
-        finalT_slide = sol.t_events[1][0]
-        finalY_slide = sol.y_events[1][0]
-
-    # sort out if you hop, slide, or neither
-    slide = False
-    if finalT_slide and finalT_hop:
-        if finalT_slide < finalT_hop:   # what if they are equal?
-          finalT = finalT_slide
-          finalY = finalY_slide
-          slide = True
-        else:
-          finalT = finalT_hop
-          finalY = finalY_hop
-    elif finalT_slide:
-        finalT = finalT_slide
-        finalY = finalY_slide
-        slide = True
-    elif finalT_hop:
-        finalT = finalT_hop
-        finalY = finalY_hop
-    else:   # neither
+        finalT = sol.t_events[0][0]
+        finalY = sol.y_events[0][0]
+    else:    # don't slide
         print("  Nothing interesting happened before tStop.")
         print("  sum of |Δtheta| =", degrees( sum(absolute(diff(sol.y[0]))) ), "degrees")
         print("  energy needed to make it over the top is", M*g*r)
@@ -323,17 +295,14 @@ def rollWithoutSliding(finalT, finalY):
     print("  final μ_s F_n - |F_fr| =", maxFriction_minus_requiredFriction(finalT, finalY))
     print("  final F_fr =", staticFriction(finalY) )
     print("  energies:", energyFunc_RollingWithoutSliding(sol.y[:,0]), energyFunc_RollingWithoutSliding(finalY))
-    if slide:
-      print("  Slide!")
-    else:
-      print("  Hop!")
+    print("  Slide!")
     print()
 
 
     # add on v_x
     finalY = concatenate(( finalY,  [ - r * finalY[1] ] ))
 
-    return (finalT, finalY, slide)
+    return (finalT, finalY)
 
 
 
@@ -813,13 +782,9 @@ while True:
     while True:
 
       if rollingWithoutSliding:
-          finalT, finalY, slide = rollWithoutSliding(finalT, finalY[0:2])   # will exit the code if nothing happens before tStop
+          finalT, finalY = rollWithoutSliding(finalT, finalY[0:2])   # will exit the code if nothing happens before tStop
 
-      if slide:
-          finalT, finalY, back = rollWithSliding(finalT, finalY)   # will handle sign of friction changing directions
-      else:      # hop
-          print("wowzers!! Hop without sliding!!!")
-          break
+      finalT, finalY, back = rollWithSliding(finalT, finalY)   # will handle the sign of friction changing directions
       
       if not back:   # hop
           break
