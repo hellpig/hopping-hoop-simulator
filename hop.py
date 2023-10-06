@@ -800,7 +800,7 @@ while True:
 
 
 
-#makePlots()
-#animate()
+makePlots()
+animate()
 
 
