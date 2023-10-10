@@ -376,6 +376,8 @@ def rollWithSliding(finalT, finalY):
       else:
         print("weird...", tempPos, tempNeg)
         exit()
+      # Doesn't the following always work instead of ever needing bottomAcceleration()?
+      #signFrict = sign(staticFriction(finalY))
     else:   # landing a hop then immediately sliding
       signFrict = -sign(r*finalY[1] + finalY[2])
 
