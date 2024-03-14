@@ -1,5 +1,5 @@
 # hopping-hoop-simulator
-Simulate and animate a hopping hoop! Energy conservation is confirmed throughout.
+Simulate and animate a hopping hoop! Energy conservation is confirmed throughout (except for when landing a hop).
 
 My only assumptions are (1) flat ground, (2), if possible, rolling-without-sliding initial velocity, and (3) the edge mass is exactly at the radius.
 
@@ -19,7 +19,7 @@ The best derivation of the equation of motion (the differential equation that so
 
 Another equivalent derivation method is to apply Newton's 2nd law and Newton's 2nd law for rotation to the *center of mass* (CM). You can always use any CM as its pivot even if it is accelerating. Whenever using Newton's 2nd law, the acceleration is the acceleration of the object's CM. 
 
-Whatever you do, I recommend that you check your rolling-without-sliding equation of motion with what you get from Lagrangian mechanics. To do this, define *L*, the Lagrangian, as kinetic energy minus potential energy, and write is so that *θ* and its time derivative (*ω*) are the only time-dependent variables that appear. Then, ∂*L*/∂*θ* = d(∂*L*/∂*ω*)/dt gives the equation of motion.
+Whatever you do, I recommend that you check your rolling-without-sliding equation of motion with what you get from Lagrangian mechanics. To do this, define *L*, the Lagrangian, as kinetic energy minus potential energy, and write is so that *θ* and its time derivative (*ω*) are the only time-dependent variables that appear. Then, ∂*L*/∂*θ* = d(∂*L*/∂*ω*)/dt gives the equation of motion. Another way to derive the rolling-without-sliding equation of motion is to write down the energy equation then take the time derivative of it.
 
 Keep in mind that, whenever calculating kinetic energy, it only equals rotational + translational if each are describing the CM. So, for convenience, for everything but the hop, I find the kinetic energy of each object separately then add them together.
 

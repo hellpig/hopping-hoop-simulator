@@ -513,7 +513,7 @@ def hop(finalT, finalY):
 
 
     # y_center is trivially 0 when t=0 and is zero when hoop hits the ground
-    # I do not believe that there are ever more solutions than this
+    # I do not believe that there are ever more solutions than this at later times, and I will assume there are not.
     def y_center(t):
       return r_cm * sin(finalY[0]) + vy0 * t - 0.5 * g * t**2 - r_cm * sin(finalY[0] + finalY[1] * t)
 
@@ -597,7 +597,7 @@ def hop(finalT, finalY):
 Assume that the time of the collision (the time until vy_center is 0) is negligibly small.
 This means that θ is constant and the force of gravity can be ignored.
 
-Energy confirmation is not confirmed here
+Energy conservation is not confirmed here
 
 Instead of time, track omega, vx_cm, and vy_cm using vertical impulse on combined mass (Fnt).
 From Newton's 2nd law in y direction:
