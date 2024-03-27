@@ -92,7 +92,7 @@ if I > m*r*r:
 ## pre calculate
 
 g_over_r = g/r
-aTerm = I / (M * r * r) + m/M + 2.0   # this is a constant term in the rolling without sliding ODE
+aTerm = I / (M * r * r) + m/M + 2.0   # this is a constant term in the rolling-without-sliding ODE
 weight = (m+M)*g
 M_times_r = M*r
 m_times_r = m*r
@@ -101,12 +101,11 @@ m_times_r = m*r
 r_cm = M*r / (m+M)
 I_cm = I + M*r*r - (m+M)*r_cm*r_cm
 
-# for the rolling with sliding ODE to get the angular acceleration alpha
-# Thanks to https://github.com/Nacho-Meter-Stick for finding this computationally faster algebraic form!
-C1 = M + m
-C2 = M*r*r
-C3 = g*r*(M + m)
-C4 = I*(M + m) + m*M*r*r
+# for the rolling-with-sliding ODE to get the angular acceleration alpha
+# Thanks to https://github.com/Nacho-Meter-Stick for finding this clean and computationally faster algebraic form!
+C3 = M+m
+C4 = g*(M+m)/(M*r)
+C5 = I*(M+m)/(M*r*r) + m
 
 frac = M/(m+M)
 
@@ -328,8 +327,8 @@ def bottomAcceleration(signFrict, y):
   s = sin(y[0])
   c = cos(y[0])
   temp = y[1]*y[1]*s
-  temp2 = M*(c - mu*s) - mu*C1
-  alpha = ((C2*temp - C3)*temp2) / (C2*c*temp2 + C4)
+  temp2 = M*(c - mu*s) - mu*C3
+  alpha = (temp - C4)*temp2 / (c*temp2 + C5)
   dvxdt_over_r = mu*g_over_r + ( mu*(-temp + alpha*c) + (temp*c/s + alpha*s) )*frac
   return r*(alpha + dvxdt_over_r)
 
@@ -353,8 +352,8 @@ def rollWithSliding(finalT, finalY):
       s = sin(y[0])
       c = cos(y[0])
       temp = y[1]*y[1]*s
-      temp2 = M*(c - mu*s) - mu*C1
-      alpha = ((C2*temp - C3)*temp2) / (C2*c*temp2 + C4)
+      temp2 = M*(c - mu*s) - mu*C3
+      alpha = (temp - C4)*temp2 / (c*temp2 + C5)
       return ( y[1], alpha, r*(mu*g_over_r + ( mu*(-temp + alpha*c) + (temp*c/s + alpha*s) )*frac), -(r*y[1]+y[2]) * mu * ( M_times_r * (alpha * c - temp) + weight ) )
 
     def normalForceSliding(t, y):
@@ -362,8 +361,8 @@ def rollWithSliding(finalT, finalY):
       s = sin(y[0])
       c = cos(y[0])
       temp = y[1]*y[1]*s
-      temp2 = M*(c - mu*s) - mu*C1
-      alpha = ((C2*temp - C3)*temp2) / (C2*c*temp2 + C4)
+      temp2 = M*(c - mu*s) - mu*C3
+      alpha = (temp - C4)*temp2 / (c*temp2 + C5)
       return M_times_r * (alpha * c - temp) + weight
 
     def speedDiff(t, y):
@@ -735,8 +734,8 @@ def land(finalY):
     hop = False
     if not static:   # this Fn calculation is basically copied and pasted from previous sliding code
         temp = omega*omega*s
-        temp2 = M*(c - mu*s) - mu*C1
-        alpha = ((C2*temp - C3)*temp2) / (C2*c*temp2 + C4)
+        temp2 = M*(c - mu*s) - mu*C3
+        alpha = (temp - C4)*temp2 / (c*temp2 + C5)
         Fn = M_times_r * (alpha * c - temp) + weight
         if Fn < 0:
           print("  Hop! Initial ay_center won't be 0")
