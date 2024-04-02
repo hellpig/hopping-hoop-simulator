@@ -14,6 +14,10 @@ Some papers care about skidding vs slipping, which I guess is found by comparing
 
 Run the Python file, hop.py! I use Matplotlib for graphs and animation, and I use SciPy for the numerical solvers and integrators. Change the parameters in the parameter section near the top of the file! Since SciPy's solve_ivp() solves the differential equations, you don't even have to know about differential equations to follow all of the code!
 
+My code reproduces the results of the following paper...  
+[https://www.sciencedirect.com/science/article/pii/S0895717708000289](https://www.sciencedirect.com/science/article/pii/S0895717708000289)  
+To easily compare results, in my code, (1) set *g*, *r*, *m*, and *I* to 1.0, (2) set *M* to 3.0, (3) set *theta0* to radians(90) where their angle is (90° - myAngle) mod 360°, and (4) set *mu_k* to whatever matches the particular graph in the paper, such as 0.2, then, due to how I calculate things (see my discussion of finding the sign of *F*_friction below), set *mu_s* to something like 0.20001. For my sanity, I also added an *if finalT > 10: exit()* in the driver code, though a better fix would be to create new events for solve_ivp() that stop when either a full revolution has been made or the angular velocity changes sign.
+
 # general math
 The best derivation of the equation of motion (the differential equation that solves to give *θ*(*t*)) is to apply Newton's 2nd law to the edge mass, *M*, and the hoop of mass *m* separately, then use Newton's 3rd law to relate the contact force between them. Finally, apply Newton's 2nd law for rotation (net torque = *I* *α*) to the *hoop*. To get the acceleration of *M*, its velocity is -*r* *ω* sin*θ* + *v\_x* in the *x* direction and *r* *ω* cos*θ* in the *y* direction, where *v\_x* = - *r* *ω* is true when rolling without sliding.
 
