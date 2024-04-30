@@ -38,8 +38,9 @@ from matplotlib import animation
 # all must be positive except for...
 #  • theta0 and omega0 can be anything
 #  • rotational inertia of hoop, I, can be 0 or positive
-#  • mu_k can be 0 or positive, but, if it is 0 and a hop doesn't occur, the code will never end!
-#  • m can be 0 or positive, but, if m=0, issues arise and stay away from theta being straight down
+#  • mu_k can be 0 or positive, but, if it is 0 and a hop doesn't occur, the code may never end!
+#  • m must be positive, though I believe m=0 works as long as no sliding starts
+#    and as long as the mass never points straight down
 #  • g can be anything, but, if g <= 0, the calculation of when hop is finished obviously breaks
 
 
@@ -67,10 +68,13 @@ theta0 = radians(-90)
 
 
 
-# absolute tolerance of simulation
+# absolute local tolerance of solve_ivp()
 abs_tol = 1E-8
 
-# to slow down the animation compared to real time
+# integration method of solve_ivp()
+integrate_method = 'Radau'
+
+# to slow down the displayed animation compared to real time
 delayMultiplier = 2   # a positive integer
 
 ## If you search this file for "feel free",
@@ -101,8 +105,9 @@ m_times_r = m*r
 r_cm = M*r / (m+M)
 I_cm = I + M*r*r - (m+M)*r_cm*r_cm
 
-# for the rolling-with-sliding ODE to get the angular acceleration alpha
-# Thanks to https://github.com/Nacho-Meter-Stick for finding this clean and computationally faster algebraic form!
+# for the rolling-with-sliding ODE to get the angular acceleration, alpha
+# Thanks to https://github.com/Nacho-Meter-Stick for finding this clean
+#   and computationally faster algebraic form!
 C3 = M+m
 C4 = g*(M+m)/(M*r)
 C5 = I*(M+m)/(M*r*r) + m
@@ -253,7 +258,7 @@ def rollWithoutSliding(finalT, finalY):
     tStop = 10/abs(finalY[1])   # feel free to change!
     tList = linspace(finalT, finalT + tStop, num=101)   # nice for making plot; feel free to change num
 
-    sol = solve_ivp(derivatives, (finalT, finalT + tStop), finalY, method = 'Radau', atol = abs_tol, events = eventTuple, t_eval = tList)
+    sol = solve_ivp(derivatives, (finalT, finalT + tStop), finalY, method = integrate_method, atol = abs_tol, events = eventTuple, t_eval = tList)
 
 
 
@@ -407,7 +412,7 @@ def rollWithSliding(finalT, finalY):
         tStop += 2*abs(r*finalY[1] + finalY[2])/(mu_k * g)     # feel free to change the 2! Only does anything if landing a hop then immediately sliding
         tList = linspace(finalT, finalT + tStop, num=101)   # nice for making plot; feel free to change num
 
-        solSlide = solve_ivp(derivativesSliding, (finalT, finalT + tStop), (finalY[0],finalY[1],finalY[2],0.0), method = 'Radau', atol = abs_tol, events = eventTuple, t_eval = tList)
+        solSlide = solve_ivp(derivativesSliding, (finalT, finalT + tStop), (finalY[0],finalY[1],finalY[2],0.0), method = integrate_method, atol = abs_tol, events = eventTuple, t_eval = tList)
 
 
 

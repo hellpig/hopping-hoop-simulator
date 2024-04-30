@@ -1,12 +1,12 @@
 # hopping-hoop-simulator
 Simulate and animate a hopping hoop! Energy conservation is confirmed throughout (except for when landing a hop).
 
-My only assumptions are (1) flat ground, (2), if possible, rolling-without-sliding initial velocity, and (3) the edge mass is exactly at the radius.
-
-For fun, the code will, by default, continue after landing a hop. I assume that the time of the collision (the time until vy\_center is 0) is negligibly small. Sometimes, another hop occurs just after landing!
-
 Hopping hoop...  
 [https://youtu.be/ETRpkp03stQ](https://youtu.be/ETRpkp03stQ)
+
+My assumptions are (1) flat rigid ground, (2), if possible, rolling-without-sliding initial velocity, and (3) the edge mass is exactly at the radius of a rigid hoop.
+
+For fun, the code will, by default, continue after landing a hop. I assume that the time of the collision (the time until vy\_center is 0) is negligibly small. Sometimes, another hop occurs just after landing!
 
 Some papers care about skidding vs slipping, which I guess is found by comparing the direction of the center of the hoop's velocity, *v\_x*, to the direction of the force of kinetic friction. My code prints both directions, but I prefer to just call all of it sliding. Then, if the hoop starts with the edge mass being straight down, there are two simple cases...
 * rolling without sliding → slide → rolling without sliding → slide → ...
@@ -14,7 +14,7 @@ Some papers care about skidding vs slipping, which I guess is found by comparing
 
 Run the Python file, hop.py! I use Matplotlib for graphs and animation, and I use SciPy for the numerical solvers and integrators. Change the parameters in the parameter section near the top of the file! Since SciPy's solve\_ivp() solves the differential equations, you don't even have to know about differential equations to follow all of the code!
 
-My code reproduces the results of the following paper...  
+My code reproduces the results of the following paper by W.F.D. Theron and M.F. Maritz...  
 [https://www.sciencedirect.com/science/article/pii/S0895717708000289](https://www.sciencedirect.com/science/article/pii/S0895717708000289)  
 To easily compare results, in my code, (1) set *g*, *r*, *m*, and *I* to 1.0, (2) set *M* to 3.0, (3) set *theta0* to radians(90) where their angle is (90° - myAngle) mod 360°, and (4) set *mu\_k* to whatever matches the particular graph in the paper, such as 0.2, then, due to how I calculate things (see my discussion of finding the sign of *F*\_friction below), set *mu\_s* to something like 0.20001. For my sanity, I also added an *if finalT > 10: exit()* in the driver code, though a better fix would be to create new events for solve\_ivp() that stop when either a full revolution has been made or the angular velocity changes sign.
 
