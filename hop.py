@@ -21,9 +21,9 @@
 # (c) 2023 Bradley Knockel
 
 
-from numpy import sin, cos, sqrt, radians, degrees, sign, absolute, diff, linspace, concatenate, isclose, arange, interp
+from numpy import sin, cos, sqrt, radians, degrees, sign, absolute, diff, linspace, concatenate, arange, interp
 from scipy.integrate import solve_ivp, cumulative_trapezoid
-from scipy.optimize import fsolve
+from scipy.optimize import brentq
 import matplotlib.pyplot as plt
 from matplotlib import animation
 
@@ -37,10 +37,11 @@ from matplotlib import animation
 #############################
 # all must be positive except for...
 #  • theta0 and omega0 can be anything
-#  • rotational inertia of hoop, I, can be 0 or positive
-#  • mu_k can be 0 or positive, but, if it is 0 and a hop doesn't occur, the code may never end!
-#  • m must be positive, though I believe m=0 works as long as no sliding starts
-#    and as long as the mass never points straight down
+#  • rotational inertia of hoop, I, must be positive
+#  • mu_k must be positive
+#  • m must be positive. The m = 0 case is singular and should be treated as a limit:
+#    use a very small positive m instead. If m = 0, then I = 0 in this model, and the
+#    equations become degenerate when the edge mass is at or near the contact point.
 #  • g can be anything, but, if g <= 0, the calculation of when hop is finished obviously breaks
 
 
@@ -59,7 +60,7 @@ mu_k = 0.1
 M = 1.0
 
 # initial conditions (rad and rad/s)
-omega0 = -11
+omega0 = -18
 # Straight down (-90 degrees) and straight up (90 degrees) are great because they
 #   make the sign of omega0 trivial.
 # Straight down can always begin without sliding and avoids any unnecessary sliding before any hop.
@@ -68,11 +69,13 @@ theta0 = radians(-90)
 
 
 
-# absolute local tolerance of solve_ivp()
-abs_tol = 1E-8
+# absolute and relative local tolerance of solve_ivp()
+abs_tol = 1E-9
+rel_tol = 1E-9
 
 # integration method of solve_ivp()
-integrate_method = 'Radau'
+integrate_method = 'DOP853'
+integrate_method = 'Radau'  # the big guns; probably overkill
 
 # to slow down the displayed animation compared to real time
 delayMultiplier = 2   # a positive integer
@@ -255,10 +258,11 @@ def rollWithoutSliding(finalT, finalY):
 
     eventTuple = (maxFriction_minus_requiredFriction)
 
-    tStop = 10/abs(finalY[1])   # feel free to change!
+    omega_scale = max(abs(finalY[1]), 1e-9)  # prevent division by zero
+    tStop = min(10/omega_scale, 1000)        # feel free to change!
     tList = linspace(finalT, finalT + tStop, num=101)   # nice for making plot; feel free to change num
 
-    sol = solve_ivp(derivatives, (finalT, finalT + tStop), finalY, method = integrate_method, atol = abs_tol, events = eventTuple, t_eval = tList)
+    sol = solve_ivp(derivatives, (finalT, finalT + tStop), finalY, method = integrate_method, atol = abs_tol, rtol=rel_tol, events = eventTuple, t_eval = tList)
 
 
 
@@ -331,10 +335,11 @@ def bottomAcceleration(signFrict, y):
 
   s = sin(y[0])
   c = cos(y[0])
-  temp = y[1]*y[1]*s
+  omega2 = y[1] * y[1]
+  temp = omega2 * s
   temp2 = M*(c - mu*s) - mu*C3
   alpha = (temp - C4)*temp2 / (c*temp2 + C5)
-  dvxdt_over_r = mu*g_over_r + ( mu*(-temp + alpha*c) + (temp*c/s + alpha*s) )*frac
+  dvxdt_over_r = mu*g_over_r + ( mu*(-temp + alpha*c) + (omega2*c + alpha*s) )*frac
   return r*(alpha + dvxdt_over_r)
 
 
@@ -356,10 +361,11 @@ def rollWithSliding(finalT, finalY):
     def derivativesSliding(t, y):
       s = sin(y[0])
       c = cos(y[0])
-      temp = y[1]*y[1]*s
+      omega2 = y[1] * y[1]
+      temp = omega2 * s
       temp2 = M*(c - mu*s) - mu*C3
       alpha = (temp - C4)*temp2 / (c*temp2 + C5)
-      return ( y[1], alpha, r*(mu*g_over_r + ( mu*(-temp + alpha*c) + (temp*c/s + alpha*s) )*frac), -(r*y[1]+y[2]) * mu * ( M_times_r * (alpha * c - temp) + weight ) )
+      return ( y[1], alpha, r*(mu*g_over_r + ( mu*(-temp + alpha*c) + (omega2*c + alpha*s) )*frac), -(r*y[1]+y[2]) * mu * ( M_times_r * (alpha * c - temp) + weight ) )
 
     def normalForceSliding(t, y):
       #return derivativesSliding(t,y)[3] / ((r*y[1]+y[2]) * mu)    # can divide by 0
@@ -408,11 +414,17 @@ def rollWithSliding(finalT, finalY):
 
         eventTuple = (normalForceSliding, speedDiff)
 
-        tStop = 10/abs(finalY[1])   # feel free to change the 10!  
-        tStop += 2*abs(r*finalY[1] + finalY[2])/(mu_k * g)     # feel free to change the 2! Only does anything if landing a hop then immediately sliding
+        omega_scale = max(abs(finalY[1]), 1e-9)  # prevent division by zero
+        tStop = min(10/omega_scale, 1000)        # feel free to change the 10 and 1000!
+
+        # If sliding begins from rolling-without-sliding, v_bottom = r*omega + v_x is zero,
+        # so this adds nothing. After landing a hop, v_bottom may be nonzero, so add
+        # enough time for kinetic friction to significantly reduce/reverse the slip.
+        tStop += 2*abs(r*finalY[1] + finalY[2])/(mu_k * g)
+
         tList = linspace(finalT, finalT + tStop, num=101)   # nice for making plot; feel free to change num
 
-        solSlide = solve_ivp(derivativesSliding, (finalT, finalT + tStop), (finalY[0],finalY[1],finalY[2],0.0), method = integrate_method, atol = abs_tol, events = eventTuple, t_eval = tList)
+        solSlide = solve_ivp(derivativesSliding, (finalT, finalT + tStop), (finalY[0],finalY[1],finalY[2],0.0), method = integrate_method, atol = abs_tol, rtol=rel_tol, events = eventTuple, t_eval = tList)
 
 
 
@@ -536,12 +548,34 @@ def hop(finalT, finalY):
     def energyFunc_Air(t):
       return 0.5 * (m + M) * (vx0 * vx0 + (vy0 - g * t)**2 ) + weight * (r_cm * sin(finalY[0]) + vy0 * t - 0.5 * g * t**2) + 0.5 * I_cm * finalY[1] * finalY[1]
 
+    # Find the first positive landing time using a bracketed root finder.
+    # Credit: written by ChatGPT in 2026
+    def find_landing_time():
+        eps = 1E-9
+
+        # Start with a reasonable positive upper bound and expand until y_center is below ground.
+        t_hi = max(1.0, 4.0 * (abs(vy0) + abs(r_cm * finalY[1]) + sqrt(g * r)) / g)
+
+        while y_center(t_hi) > 0:
+            t_hi *= 2.0
+
+        # Find the first positive crossing.
+        t_grid = linspace(eps, t_hi, 1000)
+        y_grid = y_center(t_grid)
+
+        for i in range(len(t_grid) - 1):
+            if y_grid[i] > 0 and y_grid[i + 1] <= 0:
+                return brentq(y_center, t_grid[i], t_grid[i + 1])
+
+        print("  ERROR: failed to bracket positive landing time")
+        exit()
+
 
 
     temp = ay_center(0)
     print("  initial ay_center =", temp )  # should not be negative
     '''
-    if not isclose(temp, 0.0, atol = abs_tol):
+    if not isclose(temp, 0.0, atol = abs_tol):   # isclose() is from numpy
       print("oh no!")
       exit()
     '''
@@ -550,14 +584,7 @@ def hop(finalT, finalY):
 
     # find t, the time the ball is in the air
     bestGuess = 2*vy0/g  # completely ignores rotation of the hoop
-    guesses = linspace(3*bestGuess, 0.0, num = 101)   # feel free to change
-    absoluteTolerance = 1E-5                          # feel free to change
-    for guess in guesses:
-      t = fsolve(y_center, guess)[0]
-      if not isclose(t, 0.0, atol = absoluteTolerance):
-        break
-    if isclose(t, 0.0, atol = absoluteTolerance):
-      print("  ERROR: fsolve() failed to find non-trivial solution")
+    t = find_landing_time()
 
 
     # make graph
